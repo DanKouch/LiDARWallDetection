@@ -1,0 +1,1 @@
+sudo ufw allow from any to any port 2115 proto udp

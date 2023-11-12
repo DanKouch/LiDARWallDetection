@@ -7,7 +7,7 @@ LIB_PATH="$FINAL_PROJECT_PATH/lib"
 BUILD_PATH="$FINAL_PROJECT_PATH/build/SICK"
 
 # Make sure library submodules are pulled
-# git pull --recurse-submodules
+git pull --recurse-submodules
 
 mkdir -p $BUILD_PATH
 
