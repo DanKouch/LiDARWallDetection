@@ -3,3 +3,4 @@ planeExtraction: planeExtraction.cpp fileHandler.cpp dataFrame.cpp cpuImplementa
 
 run-example: planeExtraction
 	./planeExtraction ../sample_input/zero_deg_only/ehall_1800_back/bin/frame_0.zeroDeg.bin
+	

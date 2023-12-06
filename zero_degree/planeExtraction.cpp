@@ -1,6 +1,8 @@
 #include <cstdio>
 #include <cstdint>
 #include <assert.h>
+#include <cstdlib>
+
 #include "fileHandler.hpp"
 #include "dataFrame.hpp"
 #include "cpuImplementation.hpp"
@@ -8,6 +10,8 @@
 using namespace std;
 
 #define USAGE_STRING "./planeExtraction [fileName]"
+
+#define MAX_SEGMENT_DESC 500
 
 int main(int argc, char **argv) {
     if(argc != 2) {
@@ -25,7 +29,19 @@ int main(int argc, char **argv) {
     data_frame_desc_t dataFrameDesc;
     populateLidarDataFrameDesc(mmapDesc.data, &dataFrameDesc);
 
-    cpuPlaneExtract(&dataFrameDesc);
+    segment_desc_t *segmentDescs = (segment_desc_t *) malloc(sizeof(segmentDescs) * MAX_SEGMENT_DESC);
+    uint32_t numSegmentDesc;
+
+    cpuPlaneExtract(&dataFrameDesc, segmentDescs, MAX_SEGMENT_DESC, &numSegmentDesc);
+
+    // Print segments in csv format
+    // start_x, start_y, end_x, end_y
+    for(uint32_t i = 0; i < numSegmentDesc; i++) {
+        uint32_t start = segmentDescs[i].segmentStart;
+        uint32_t end = segmentDescs[i].segmentEnd;
+        printf("%f, %f, %f, %f\n", dataFrameDesc.x[start], dataFrameDesc.y[start],
+                                   dataFrameDesc.x[end], dataFrameDesc.y[end]);
+    }   
 
     if(unmmap_file(&mmapDesc) != 0) {
         return -1;
