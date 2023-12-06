@@ -3,6 +3,7 @@
 #include <assert.h>
 #include "fileHandler.hpp"
 #include "dataFrame.hpp"
+#include "cpuImplementation.hpp"
 
 using namespace std;
 
@@ -24,12 +25,7 @@ int main(int argc, char **argv) {
     data_frame_desc_t dataFrameDesc;
     populateLidarDataFrameDesc(mmapDesc.data, &dataFrameDesc);
 
-    printf("Num Points: %d\n", dataFrameDesc.numPoints);
-
-    // Print all points
-    for(uint32_t i = 0; i < dataFrameDesc.numPoints; i++) {
-        printf("%f, %f, %f\n", dataFrameDesc.x[i], dataFrameDesc.y[i], dataFrameDesc.z[i]);
-    }
+    cpuPlaneExtract(&dataFrameDesc);
 
     if(unmmap_file(&mmapDesc) != 0) {
         return -1;
