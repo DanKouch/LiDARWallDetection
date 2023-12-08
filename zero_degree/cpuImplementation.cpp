@@ -50,7 +50,7 @@ void identifyStraightSegments(const data_frame_desc_t *desc, segment_desc_t segm
         double sumYSquared = 0;
 
         // Determine convoltion width n, which should be inversely preportional to radius
-        double radius = sqrt(pow(desc->x[i], 2) + pow(desc->x[i], 2));
+        double radius = sqrt(pow(desc->x[i], 2) + pow(desc->y[i], 2));
         long n = (long) (((double) REG_POINTS_PER_INV_METER) * (1/radius));
 
         // Limit the number of points that can be involved in the convolution
@@ -89,7 +89,7 @@ void identifyStraightSegments(const data_frame_desc_t *desc, segment_desc_t segm
         // Distance from previous point
         float dist = 0;
         if(i > 0) {
-            dist = sqrt(pow((desc->x[i] - desc->x[i-1]), 2) + pow((desc->x[i] - desc->x[i-1]), 2));
+            dist = sqrt(pow((desc->x[i] - desc->x[i-1]), 2) + pow((desc->y[i] - desc->y[i-1]), 2));
         }
 
         // Search for straight segments, where r_squared >= R_SQUARED_THRESHOLD
