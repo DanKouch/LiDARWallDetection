@@ -29,4 +29,4 @@ def getLinesFromIndexFile(indexFilePath, points):
                 tuple(points[indices[1]])],
                 lineSegmentIndices))
     
-    return lines
+    return lines, lineSegmentIndices

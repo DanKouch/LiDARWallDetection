@@ -1,13 +1,6 @@
 import argparse
-import numpy as np
-import csv
-import math
 from zeroDegreeBinUtils import *
 import matplotlib.pyplot as plt
-import matplotlib.collections as mc
-import matplotlib.colors as mcol
-import struct
-import sys
 
 # Get filename
 parser = argparse.ArgumentParser(
@@ -16,6 +9,7 @@ parser = argparse.ArgumentParser(
 )
 
 parser.add_argument("frameBinFile", help="Path of .bin frame file to display.")
+parser.add_argument("--outFile", help="Path to write output figure to.")
 
 args = parser.parse_args()
 
@@ -33,4 +27,7 @@ ax.margins(0.1)
 ax.set_xlabel('X')
 ax.set_ylabel('Y')
 
-plt.savefig("points.png")
+plt.show()
+
+if(args.outFile is not None):
+    plt.savefig(args.outFile)

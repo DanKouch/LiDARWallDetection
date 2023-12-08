@@ -6,6 +6,7 @@
 #include "fileHandler.hpp"
 #include "dataFrame.hpp"
 #include "cpuImplementation.hpp"
+#include "zeroDegree.hpp"
 
 using namespace std;
 
@@ -32,7 +33,9 @@ int main(int argc, char **argv) {
     segment_desc_t *segmentDescs = (segment_desc_t *) malloc(sizeof(segmentDescs) * MAX_SEGMENT_DESC);
     uint32_t numSegmentDesc;
 
+#ifdef CPU_IMPLEMENTATION
     cpuPlaneExtract(&dataFrameDesc, segmentDescs, MAX_SEGMENT_DESC, &numSegmentDesc);
+#endif
 
 #ifndef PRINT_R_SQUARED
 #ifdef PRINT_INDICES
@@ -52,6 +55,8 @@ int main(int argc, char **argv) {
     }
 #endif
 #endif
+
+    free(segmentDescs);
 
     if(unmmap_file(&mmapDesc) != 0) {
         return -1;

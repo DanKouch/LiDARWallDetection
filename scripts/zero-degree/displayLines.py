@@ -1,7 +1,6 @@
 import argparse
 import numpy as np
 import csv
-import math
 import matplotlib.pyplot as plt
 import matplotlib.collections as mc
 import matplotlib.colors as mcol
@@ -12,6 +11,7 @@ parser = argparse.ArgumentParser(
     description="Display lines from line CSV."
 )
 parser.add_argument("csvFile", help="Path of .csv frame file to display.")
+parser.add_argument("--outFile", help="Path to write output figure to.")
 args = parser.parse_args()
 
 with open(args.csvFile, "r") as file:
@@ -40,4 +40,7 @@ with open(args.csvFile, "r") as file:
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
     
-    plt.savefig("lines.png")
+    plt.show()
+
+    if(args.outFile is not None):
+        plt.savefig(args.outFile)

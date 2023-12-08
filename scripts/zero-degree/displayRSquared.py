@@ -1,12 +1,8 @@
 import argparse
 import numpy as np
 import csv
-import math
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-import matplotlib.colors as mcol
-from matplotlib.colors import LinearSegmentedColormap, ListedColormap
-
 
 # Get filename
 parser = argparse.ArgumentParser(
@@ -14,6 +10,7 @@ parser = argparse.ArgumentParser(
     description="Display R-Squared CSV."
 )
 parser.add_argument("csvFile", help="Path of .csv frame file to display.")
+parser.add_argument("--outFile", help="Path to write output figure to.")
 args = parser.parse_args()
 
 threshold = 0.55
@@ -47,4 +44,7 @@ with open(args.csvFile, "r") as file:
 
     plt.colorbar(mpl.cm.ScalarMappable(cmap=colormap), ax=ax)
     
-    plt.savefig("r-squared.png")
+    plt.show()
+
+    if(args.outFile is not None):
+        plt.savefig(args.outFile)

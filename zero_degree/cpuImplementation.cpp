@@ -1,29 +1,36 @@
+#ifdef CPU_IMPLEMENTATION
+
 #include <cstdio>
 #include <cstdint>
 #include <assert.h>
 #include <math.h>
 
+#include "configuration.hpp"
 #include "dataFrame.hpp"
+#include "zeroDegree.hpp"
 #include "cpuImplementation.hpp"
 
-// Parameters
-// #define CPU_IMPL_THRESHOLD 0.95
-// #define CPU_IMPL_MIN_SEGMENT_LENGTH 3
-// #define CPU_IMPL_REG_POINTS_PER_INV_METER 140
-// #define CPU_IMPL_REG_MAX_CONV_POINTS 500
-// #define MERGE_ABS_COS_TOLERANCE 0.95
-// #define DIST_TOLERANCE 1.5
+int cpuPlaneExtract(data_frame_desc_t *desc, segment_desc_t *segmentDescs, uint32_t maxSegmentDesc, uint32_t *numSegmentDesc) {
 
-#define CPU_IMPL_THRESHOLD 0.95
-#define CPU_IMPL_MIN_SEGMENT_LENGTH 3
-#define CPU_IMPL_REG_POINTS_PER_INV_METER 140
-#define CPU_IMPL_REG_MAX_CONV_POINTS 500
-#define MERGE_ABS_COS_TOLERANCE 0.95
-#define DIST_TOLERANCE 1.5
+    // 1. Identify sraight segments by using linear regression in a convolution-like fashion,
+    //    then extracting segments of at least a specified number of poiunts with r_squared values
+    //    greater than some threshold.
+    identifyStraightSegments(desc, segmentDescs, maxSegmentDesc, numSegmentDesc);
 
-// #define PRINT_R_SQUARED_CSV
-// #define PRINT_BEND_CSV
-// #define SKIP_SEGMENT_MERGING
+#ifndef SKIP_SEGMENT_MERGING
+    // 2. Comparing each segment with its immediate neighbors, merge segments if they
+    //    approximately belong to the same line and are within a specified distance of
+    //    one-another. Repeat until no more merging occurs. 
+    while(mergeNeighboringSegments(desc, segmentDescs, *numSegmentDesc) > 0) {
+
+        // 3. Condense segment descriptors to remove entries that have been merged (which
+        //    are marked by having zero length)
+        condenseSegments(segmentDescs, numSegmentDesc);
+    }    
+#endif 
+    
+    return 0;
+}
 
 // R squared formula:
 // - https://www.got-it.ai/solutions/excel-chat/excel-tutorial/r-squared/r-squared-in-excel
@@ -44,11 +51,11 @@ void identifyStraightSegments(const data_frame_desc_t *desc, segment_desc_t segm
 
         // Determine convoltion width n, which should be inversely preportional to radius
         double radius = sqrt(pow(desc->x[i], 2) + pow(desc->x[i], 2));
-        long n = (long) (((double) CPU_IMPL_REG_POINTS_PER_INV_METER) * (1/radius));
+        long n = (long) (((double) REG_POINTS_PER_INV_METER) * (1/radius));
 
         // Limit the number of points that can be involved in the convolution
-        if(n > CPU_IMPL_REG_MAX_CONV_POINTS)
-            n = CPU_IMPL_REG_MAX_CONV_POINTS;
+        if(n > REG_MAX_CONV_POINTS)
+            n = REG_MAX_CONV_POINTS;
 
         // Ensure n is odd
         if(n % 2 == 0)
@@ -85,8 +92,8 @@ void identifyStraightSegments(const data_frame_desc_t *desc, segment_desc_t segm
             dist = sqrt(pow((desc->x[i] - desc->x[i-1]), 2) + pow((desc->x[i] - desc->x[i-1]), 2));
         }
 
-        // Search for straight segments, where r_squared >= CPU_IMPL_THRESHOLD
-        if(r_squared >= CPU_IMPL_THRESHOLD && dist < DIST_TOLERANCE) {
+        // Search for straight segments, where r_squared >= R_SQUARED_THRESHOLD
+        if(r_squared >= R_SQUARED_THRESHOLD && dist < DIST_TOLERANCE) {
             // If we are at the beginning of a segment
             if(curSegmentLength == 0)
                 curSegmentStart = i;
@@ -95,7 +102,7 @@ void identifyStraightSegments(const data_frame_desc_t *desc, segment_desc_t segm
             // We've just ended a segment
             // TODO: Determine if it makes more sense to search for segments that are larger than
             //       a specified length in meters, rather than a number of points
-            if(curSegmentLength >= CPU_IMPL_MIN_SEGMENT_LENGTH) {
+            if(curSegmentLength >= MIN_SEGMENT_LENGTH) {
                 uint32_t curSegmentEnd = (uint32_t) (i - 1);
 
                 // Make sure we can fit the segment
@@ -131,26 +138,25 @@ int mergeNeighboringSegments(const data_frame_desc_t *desc, segment_desc_t segme
     for(uint32_t i = 0; i < numSegmentDesc; i++) {
         uint32_t n = (i + 1) >= numSegmentDesc ? 0 : i + 1;
 
-        float curStartX = desc->x[segmentDesc[i].segmentStart];
-        float curStartY = desc->y[segmentDesc[i].segmentStart];
-        float curEndX = desc->x[segmentDesc[i].segmentEnd];
-        float curEndY = desc->y[segmentDesc[i].segmentEnd];
+        float x1 = desc->x[segmentDesc[i].segmentStart];
+        float y1 = desc->y[segmentDesc[i].segmentStart];
+        float x2 = desc->x[segmentDesc[i].segmentEnd];
+        float y2 = desc->y[segmentDesc[i].segmentEnd];
 
-        float nextStartX = desc->x[segmentDesc[n].segmentStart];
-        float nextStartY = desc->y[segmentDesc[n].segmentStart];
-        float nextEndX = desc->x[segmentDesc[n].segmentEnd];
-        float nextEndY = desc->y[segmentDesc[n].segmentEnd];
+        float x3 = desc->x[segmentDesc[n].segmentStart];
+        float y3 = desc->y[segmentDesc[n].segmentStart];
+        float x4 = desc->x[segmentDesc[n].segmentEnd];
+        float y4 = desc->y[segmentDesc[n].segmentEnd];
 
         // Take dot product of (curEnd-curStart) and (nextEnd-nextStart)
-        float dot = (curEndX-curStartX)*(nextEndX-nextStartX) + (curEndY-curStartY)*(nextEndY-nextStartY);
+        float dot = (x2-x1)*(x4-x3) + (y2-y1)*(y4-y3);
 
         // Equivilant to abs(cos(theta)), where theta is angle between the current segment and the next
         float absCos = abs(dot/(
-                         sqrt(pow((curEndX - curStartX), 2) + pow((curEndY - curStartY), 2)) *
-                         sqrt(pow((nextEndX - nextStartX), 2) + pow((nextEndY - nextStartY), 2))));
+                         sqrt(pow((x2 - x1), 2) + pow((y2 - y1), 2)) *
+                         sqrt(pow((x4 - x3), 2) + pow((y4 - y3), 2))));
         
-        float dist = sqrt(pow((curEndX - nextStartX), 2) + pow((curEndY - nextStartY), 2));
-        //fprintf(stderr, "[%u %u], %f, %f m\n", i, n, absCos, dist);
+        float dist = sqrt(pow((x2 - x3), 2) + pow((y2 - y3), 2));
 
         if(absCos > MERGE_ABS_COS_TOLERANCE && dist < DIST_TOLERANCE) {
             // Combine current segment with next
@@ -158,7 +164,10 @@ int mergeNeighboringSegments(const data_frame_desc_t *desc, segment_desc_t segme
 
             // Remove next segment by setting its length to 0
             segmentDesc[n].segmentStart = segmentDesc[n].segmentEnd;
-            i ++;
+
+            // Skip next segment
+            i++;
+
             removed ++;
         }
     }
@@ -186,30 +195,4 @@ void condenseSegments(segment_desc_t segmentDesc[], uint32_t *numSegmentDesc) {
     *numSegmentDesc = newI;
 }
 
-int cpuPlaneExtract(data_frame_desc_t *desc, segment_desc_t *segmentDescs, uint32_t maxSegmentDesc, uint32_t *numSegmentDesc) {
-    float *convolutionOut = (float *) malloc(sizeof(float) * desc->numPoints);
-    if(convolutionOut == nullptr) {
-        fprintf(stderr, "Error: Couldn't malloc.\n");
-        return -1;
-    }
-
-    // 1. Identify sraight segments by using linear regression in a convolution-like fashion,
-    //    then extracting segments of at least a specified number of poiunts with r_squared values
-    //    greater than some threshold.
-    identifyStraightSegments(desc, segmentDescs, maxSegmentDesc, numSegmentDesc);
-
-#ifndef SKIP_SEGMENT_MERGING
-
-    // 2. Comparing each segment with its immediate neighbors, merge segments if they
-    //    approximately belong to the same line and are within a specified distance of
-    //    one-another. Repeat until no more merging occurs. 
-    while(mergeNeighboringSegments(desc, segmentDescs, *numSegmentDesc) > 0) {
-
-        // 3. Condense segment descriptors to remove entries that have been merged (which
-        //    are marked by having zero length)
-        condenseSegments(segmentDescs, numSegmentDesc);
-    }    
-#endif 
-    
-    return 0;
-}
+#endif
