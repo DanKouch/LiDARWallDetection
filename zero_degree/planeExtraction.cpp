@@ -34,6 +34,14 @@ int main(int argc, char **argv) {
 
     cpuPlaneExtract(&dataFrameDesc, segmentDescs, MAX_SEGMENT_DESC, &numSegmentDesc);
 
+#ifndef PRINT_R_SQUARED
+#ifdef PRINT_INDICES
+    // Print segment indices in csv format
+    // segment_start_index, segment_end_index
+    for(uint32_t i = 0; i < numSegmentDesc; i++) {
+        printf("%u, %u\n", segmentDescs[i].segmentStart, segmentDescs[i].segmentEnd);
+    }
+#else
     // Print segments in csv format
     // start_x, start_y, end_x, end_y
     for(uint32_t i = 0; i < numSegmentDesc; i++) {
@@ -41,7 +49,9 @@ int main(int argc, char **argv) {
         uint32_t end = segmentDescs[i].segmentEnd;
         printf("%f, %f, %f, %f\n", dataFrameDesc.x[start], dataFrameDesc.y[start],
                                    dataFrameDesc.x[end], dataFrameDesc.y[end]);
-    }   
+    }
+#endif
+#endif
 
     if(unmmap_file(&mmapDesc) != 0) {
         return -1;

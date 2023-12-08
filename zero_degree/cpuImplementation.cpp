@@ -7,10 +7,19 @@
 #include "cpuImplementation.hpp"
 
 // Parameters
+// #define CPU_IMPL_THRESHOLD 0.95
+// #define CPU_IMPL_MIN_SEGMENT_LENGTH 3
+// #define CPU_IMPL_REG_POINTS_PER_INV_METER 140
+// #define CPU_IMPL_REG_MAX_CONV_POINTS 500
+// #define MERGE_ABS_COS_TOLERANCE 0.95
+// #define DIST_TOLERANCE 1.5
+
 #define CPU_IMPL_THRESHOLD 0.95
 #define CPU_IMPL_MIN_SEGMENT_LENGTH 3
 #define CPU_IMPL_REG_POINTS_PER_INV_METER 140
 #define CPU_IMPL_REG_MAX_CONV_POINTS 500
+#define MERGE_ABS_COS_TOLERANCE 0.95
+#define DIST_TOLERANCE 1.5
 
 // #define PRINT_R_SQUARED_CSV
 // #define PRINT_BEND_CSV
@@ -66,18 +75,18 @@ void identifyStraightSegments(const data_frame_desc_t *desc, segment_desc_t segm
                     / ((n*sumXSquared - pow(sumX, 2))
                         * (n*sumYSquared - pow(sumY, 2)));
 
-#ifdef PRINT_R_SQUARED_CSV
+#ifdef PRINT_R_SQUARED
         printf("%f, %f, %f, %f\n", desc->x[i], desc->y[i], desc->z[i], r_squared);
 #endif
 
-    // A bend has occured if r_squared < CPU_IMPL_THRESHOLD
+        // Distance from previous point
+        float dist = 0;
+        if(i > 0) {
+            dist = sqrt(pow((desc->x[i] - desc->x[i-1]), 2) + pow((desc->x[i] - desc->x[i-1]), 2));
+        }
 
-#ifdef PRINT_BEND_CSV
-        printf("%f, %f, %f, %d\n", desc->x[i], desc->y[i], desc->z[i], (r_squared < CPU_IMPL_THRESHOLD ? 1 : 0));
-#endif
-
-        // Search for straight segments
-        if(r_squared >= CPU_IMPL_THRESHOLD) {
+        // Search for straight segments, where r_squared >= CPU_IMPL_THRESHOLD
+        if(r_squared >= CPU_IMPL_THRESHOLD && dist < DIST_TOLERANCE) {
             // If we are at the beginning of a segment
             if(curSegmentLength == 0)
                 curSegmentStart = i;
@@ -111,13 +120,53 @@ void identifyStraightSegments(const data_frame_desc_t *desc, segment_desc_t segm
 // Merge neighboring segments
 // Returns number of merged segments
 // When two segments are merged, one segment's length is set to 0
-int mergeNeighboringSegments(const data_frame_desc_t *desc, segment_desc_t segmentDescOut[], uint32_t numSegmentDesc) {
-    return 0;
+int mergeNeighboringSegments(const data_frame_desc_t *desc, segment_desc_t segmentDesc[], uint32_t numSegmentDesc) {
+    // Don't do anything if there aren't multiple lines
+    if(numSegmentDesc <= 1) {
+        return 0;
+    }
+
+    uint32_t removed = 0;
+
+    for(uint32_t i = 0; i < numSegmentDesc; i++) {
+        uint32_t n = (i + 1) >= numSegmentDesc ? 0 : i + 1;
+
+        float curStartX = desc->x[segmentDesc[i].segmentStart];
+        float curStartY = desc->y[segmentDesc[i].segmentStart];
+        float curEndX = desc->x[segmentDesc[i].segmentEnd];
+        float curEndY = desc->y[segmentDesc[i].segmentEnd];
+
+        float nextStartX = desc->x[segmentDesc[n].segmentStart];
+        float nextStartY = desc->y[segmentDesc[n].segmentStart];
+        float nextEndX = desc->x[segmentDesc[n].segmentEnd];
+        float nextEndY = desc->y[segmentDesc[n].segmentEnd];
+
+        // Take dot product of (curEnd-curStart) and (nextEnd-nextStart)
+        float dot = (curEndX-curStartX)*(nextEndX-nextStartX) + (curEndY-curStartY)*(nextEndY-nextStartY);
+
+        // Equivilant to abs(cos(theta)), where theta is angle between the current segment and the next
+        float absCos = abs(dot/(
+                         sqrt(pow((curEndX - curStartX), 2) + pow((curEndY - curStartY), 2)) *
+                         sqrt(pow((nextEndX - nextStartX), 2) + pow((nextEndY - nextStartY), 2))));
+        
+        float dist = sqrt(pow((curEndX - nextStartX), 2) + pow((curEndY - nextStartY), 2));
+        //fprintf(stderr, "[%u %u], %f, %f m\n", i, n, absCos, dist);
+
+        if(absCos > MERGE_ABS_COS_TOLERANCE && dist < DIST_TOLERANCE) {
+            // Combine current segment with next
+            segmentDesc[i].segmentEnd = segmentDesc[n].segmentEnd;
+
+            // Remove next segment by setting its length to 0
+            segmentDesc[n].segmentStart = segmentDesc[n].segmentEnd;
+            i ++;
+            removed ++;
+        }
+    }
+
+    return removed;
 }
 
 // Remove segments of length 0
-// TODO: Determine if this is worth it, compared to just printing the non-zero ones
-// TODO: Test to verify this works
 void condenseSegments(segment_desc_t segmentDesc[], uint32_t *numSegmentDesc) {
     uint32_t newI = 0;
     for(uint32_t originalI = 0; originalI < *numSegmentDesc; originalI++) {
@@ -154,13 +203,12 @@ int cpuPlaneExtract(data_frame_desc_t *desc, segment_desc_t *segmentDescs, uint3
     // 2. Comparing each segment with its immediate neighbors, merge segments if they
     //    approximately belong to the same line and are within a specified distance of
     //    one-another. Repeat until no more merging occurs. 
+    while(mergeNeighboringSegments(desc, segmentDescs, *numSegmentDesc) > 0) {
 
-    // TODO: Implement
-    while(mergeNeighboringSegments(desc, segmentDescs, *numSegmentDesc) > 0);
-    
-    // 3. Condense segment descriptors to remove entries that have been merged (which
-    //    are marked by having zero length)
-    condenseSegments(segmentDescs, numSegmentDesc);
+        // 3. Condense segment descriptors to remove entries that have been merged (which
+        //    are marked by having zero length)
+        condenseSegments(segmentDescs, numSegmentDesc);
+    }    
 #endif 
     
     return 0;
