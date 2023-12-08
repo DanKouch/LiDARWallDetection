@@ -3,6 +3,11 @@
 #include <assert.h>
 #include <cstdlib>
 
+#ifndef CPU_IMPLEMENTATION
+#include <cuda.h>
+#include "cudaUtil.cuh"
+#endif
+
 #include "fileHandler.hpp"
 #include "dataFrame.hpp"
 #include "cpuImplementation.hpp"
@@ -31,9 +36,22 @@ int main(int argc, char **argv) {
     populateLidarDataFrameDesc(mmapDesc.data, &dataFrameDesc);
 
     segment_desc_t *segmentDescs = (segment_desc_t *) malloc(sizeof(segmentDescs) * MAX_SEGMENT_DESC);
-    uint32_t numSegmentDesc;
+    uint32_t numSegmentDesc = 0;
 
-#ifdef CPU_IMPLEMENTATION
+#ifndef CPU_IMPLEMENTATION
+    printf("Hello!\n");
+
+    void *d_data;
+    CHECK_CUDA(cudaHostRegister(mmapDesc.data, mmapDesc.size, cudaHostRegisterDefault | cudaHostRegisterMapped | cudaHostRegisterReadOnly));
+
+    printf("Registered!\n");
+
+    CHECK_CUDA(cudaHostGetDevicePointer((void**) &d_data, (void*) mmapDesc.data, 0));
+
+    printf("Got device pointer\n");
+
+    CHECK_CUDA(cudaHostUnregister(mmapDesc.data));
+#else
     cpuPlaneExtract(&dataFrameDesc, segmentDescs, MAX_SEGMENT_DESC, &numSegmentDesc);
 #endif
 

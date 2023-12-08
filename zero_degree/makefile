@@ -4,6 +4,10 @@ SHELL := /bin/bash
 
 run:
 	mkdir -p out/
+	(sbatch --wait run.sh && echo "Output:" && cat out/ZeroDegree.out)
+
+run-cpu:
+	mkdir -p out/
 	g++ zeroDegree.cpp fileHandler.cpp dataFrame.cpp cpuImplementation.cpp -DCPU_IMPLEMENTATION -Wall -O3 -std=c++17 -o zeroDegree
 	./zeroDegree $(binFile) > out/out.csv
 	

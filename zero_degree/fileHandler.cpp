@@ -27,7 +27,7 @@ int mmap_file(const char *filePath, mmap_descriptor_t *desc) {
 
     // Perform the memory mapping
     desc->size = (long) statBuf.st_size;
-    desc->data = mmap(0, desc->size, PROT_READ, MAP_PRIVATE, fd, 0);
+    desc->data = mmap(0, desc->size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_LOCKED, fd, 0);
 
     if(desc->data == MAP_FAILED) {
         fprintf(stderr, "Error: Could not memory map file '%s': %s\n", filePath, std::strerror(errno));

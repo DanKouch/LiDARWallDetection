@@ -1,0 +1,10 @@
+#ifndef CPU_IMPLEMENTATION
+
+#ifndef GPU_IMPLEMENTATION_CUH
+#define GPU_IMPLEMENTATION_CUH
+
+
+
+#endif
+
+#endif
