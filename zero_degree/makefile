@@ -4,7 +4,7 @@ SHELL := /bin/bash
 
 run:
 	mkdir -p out/
-	(sbatch --wait run.sh && echo "Output:" && cat out/ZeroDegree.out)
+	(sbatch --wait run.sh && echo "Output:" && cat ZeroDegree.out)
 
 run-cpu:
 	mkdir -p out/
