@@ -6,11 +6,13 @@
 #ifndef CPU_IMPLEMENTATION
 #include <cuda.h>
 #include "cudaUtil.cuh"
+#include "gpuImplementation.cuh"
+#else
+#include "cpuImplementation.hpp"
 #endif
 
 #include "fileHandler.hpp"
 #include "dataFrame.hpp"
-#include "cpuImplementation.hpp"
 #include "zeroDegree.hpp"
 
 using namespace std;
@@ -35,23 +37,23 @@ int main(int argc, char **argv) {
     data_frame_desc_t dataFrameDesc;
     populateLidarDataFrameDesc(mmapDesc.data, &dataFrameDesc);
 
-    segment_desc_t *segmentDescs = (segment_desc_t *) malloc(sizeof(segmentDescs) * MAX_SEGMENT_DESC);
+    segment_desc_t *segmentDescs;
     uint32_t numSegmentDesc = 0;
 
 #ifndef CPU_IMPLEMENTATION
-    printf("Hello!\n");
-
     void *d_data;
     CHECK_CUDA(cudaHostRegister(mmapDesc.data, mmapDesc.size, cudaHostRegisterDefault | cudaHostRegisterMapped | cudaHostRegisterReadOnly));
-
-    printf("Registered!\n");
-
     CHECK_CUDA(cudaHostGetDevicePointer((void**) &d_data, (void*) mmapDesc.data, 0));
 
-    printf("Got device pointer\n");
+    float *d_px = (float *) ((char *) d_data + sizeof(uint32_t));
+    float *d_py = (float *) ((char *) d_data + sizeof(uint32_t) + (sizeof(float) * dataFrameDesc.numPoints));
+    float *d_pz = (float *) ((char *) d_data + sizeof(uint32_t) + (2 * sizeof(float) * dataFrameDesc.numPoints));
+
+    planeExtract(d_px, d_py, d_pz, dataFrameDesc.numPoints, &segmentDescs, &numSegmentDesc);
 
     CHECK_CUDA(cudaHostUnregister(mmapDesc.data));
 #else
+    segmentDescs = (segment_desc_t *) malloc(sizeof(segmentDescs) * MAX_SEGMENT_DESC);
     cpuPlaneExtract(&dataFrameDesc, segmentDescs, MAX_SEGMENT_DESC, &numSegmentDesc);
 #endif
 
@@ -74,7 +76,11 @@ int main(int argc, char **argv) {
 #endif
 #endif
 
+#ifndef CPU_IMPLEMENTATION
+    CHECK_CUDA(cudaFree(segmentDescs));
+#else
     free(segmentDescs);
+#endif
 
     if(unmmap_file(&mmapDesc) != 0) {
         return -1;

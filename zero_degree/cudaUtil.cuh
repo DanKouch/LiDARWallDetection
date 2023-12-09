@@ -4,7 +4,14 @@
 #define CUDA_UTIL_CUH
 
 #include <cuda_runtime_api.h>
+#include <cstdio>
 #include <cuda.h>
+
+#ifdef DEBUG_KERNEL
+#define KERN_DBG(f, ...) printf("[B%d T%d]: " f, blockIdx.x, threadIdx.x, __VA_ARGS__)
+#else
+#define KERN_DBG(f, ...) (void) 0
+#endif
 
 // Used this article: https://leimao.github.io/blog/Proper-CUDA-Error-Checking/
 // per @214.

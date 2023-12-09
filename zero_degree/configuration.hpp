@@ -18,7 +18,7 @@
 
 // The maximum number of points that can be considered in the R-squared
 // convolution step
-#define REG_MAX_CONV_POINTS 255
+#define REG_MAX_CONV_POINTS 65
 
 // When merging segments, the abs(cos(theta)) tolerance for considering
 // two segments to have the same angle (1 means that they would need
