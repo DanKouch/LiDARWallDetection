@@ -135,6 +135,32 @@ __global__ void lengthsAndOffsetsToSegmentDescs(uint32_t* lengths, uint32_t* off
     }
 }
 
+void runLengthEncodeBends(uint8_t *d_bends, uint32_t *d_offsets, uint32_t *d_lengths, uint32_t *d_numSegments, uint32_t numPoints) {
+    size_t cub_temp_storage_req = 0;
+    cub::DeviceRunLengthEncode::NonTrivialRuns(
+            NULL,
+            cub_temp_storage_req,
+            d_bends,
+            d_offsets,
+            d_lengths,
+            d_numSegments,
+            numPoints);
+
+    void *d_cubTempStorage;
+    CHECK_CUDA(cudaMallocManaged((void **) &d_cubTempStorage, cub_temp_storage_req, cudaMemAttachGlobal));
+
+    cub::DeviceRunLengthEncode::NonTrivialRuns(
+            d_cubTempStorage,
+            cub_temp_storage_req,
+            d_bends,
+            d_offsets,
+            d_lengths,
+            d_numSegments,
+            numPoints);
+
+    CHECK_CUDA(cudaFree(d_cubTempStorage));
+}
+
 struct NonZeroSegmentLength
 {
     CUB_RUNTIME_FUNCTION __device__ __forceinline__
@@ -174,6 +200,10 @@ void condenseSegments(segment_desc_t *segmentDescs, uint32_t *d_numSegments) {
     CHECK_CUDA(cudaFree(d_cubTempStorage));
 }
 
+uint32_t mergeSegments(segment_desc_t *segmentDescs, uint32_t *d_numSegments) {
+    return 0;
+}
+
 
 int planeExtract(float *pX, float *pY, float *pZ, uint32_t numPoints, segment_desc_t **segmentDescs, uint32_t *numSegmentDesc) {
     // Limit bounds of convolution to neighboring blocks
@@ -198,29 +228,7 @@ int planeExtract(float *pX, float *pY, float *pZ, uint32_t numPoints, segment_de
     CHECK_CUDA(cudaMallocManaged((void **) &d_offsets, sizeof(uint32_t) * numPoints/2, cudaMemAttachGlobal));
     CHECK_CUDA(cudaMallocManaged((void **) &d_lengths, sizeof(uint32_t) * numPoints/2, cudaMemAttachGlobal));
 
-    size_t cub_temp_storage_req = 0;
-    cub::DeviceRunLengthEncode::NonTrivialRuns(
-            NULL,
-            cub_temp_storage_req,
-            d_bends,
-            d_offsets,
-            d_lengths,
-            d_numSegments,
-            numPoints);
-
-    void *d_cubTempStorage;
-    CHECK_CUDA(cudaMallocManaged((void **) &d_cubTempStorage, cub_temp_storage_req, cudaMemAttachGlobal));
-    
-    cub::DeviceRunLengthEncode::NonTrivialRuns(
-            d_cubTempStorage,
-            cub_temp_storage_req,
-            d_bends,
-            d_offsets,
-            d_lengths,
-            d_numSegments,
-            numPoints);
-
-    CHECK_CUDA(cudaFree(d_cubTempStorage));
+    runLengthEncodeBends(d_bends, d_offsets, d_lengths, d_numSegments, numPoints);
 
     uint32_t numInitialSegments = *d_numSegments;
 
@@ -241,10 +249,11 @@ int planeExtract(float *pX, float *pY, float *pZ, uint32_t numPoints, segment_de
     CHECK_CUDA(cudaFree(d_offsets));
     CHECK_CUDA(cudaFree(d_lengths));
 
-    // TODO: Merge neighboring segments somehow
+    // Condense segments so long as merging reduces the number of segments
+    do {
+        condenseSegments(*segmentDescs, d_numSegments);
+    } while(mergeSegments(*segmentDescs, d_numSegments));
 
-    condenseSegments(*segmentDescs, d_numSegments);
-    
     CHECK_CUDA(cudaFree(d_numSegments));
 
     *numSegmentDesc = *d_numSegments;
