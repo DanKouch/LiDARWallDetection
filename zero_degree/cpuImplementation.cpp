@@ -24,7 +24,7 @@ int cpuPlaneExtract(data_frame_desc_t *desc, segment_desc_t *segmentDescs, uint3
     while(mergeNeighboringSegments(desc, segmentDescs, *numSegmentDesc) > 0) {
 
         // 3. Condense segment descriptors to remove entries that have been merged (which
-        //    are marked by having zero length)
+        //    are marked by having length 1)
         condenseSegments(segmentDescs, numSegmentDesc);
     }    
 #endif 
@@ -162,7 +162,7 @@ int mergeNeighboringSegments(const data_frame_desc_t *desc, segment_desc_t segme
             // Combine current segment with next
             segmentDesc[i].segmentEnd = segmentDesc[n].segmentEnd;
 
-            // Remove next segment by setting its length to 0
+            // Remove next segment by setting its length to 1
             segmentDesc[n].segmentStart = segmentDesc[n].segmentEnd;
 
             // Skip next segment
@@ -175,7 +175,7 @@ int mergeNeighboringSegments(const data_frame_desc_t *desc, segment_desc_t segme
     return removed;
 }
 
-// Remove segments of length 0
+// Remove segments of length 1
 void condenseSegments(segment_desc_t segmentDesc[], uint32_t *numSegmentDesc) {
     uint32_t newI = 0;
     for(uint32_t originalI = 0; originalI < *numSegmentDesc; originalI++) {

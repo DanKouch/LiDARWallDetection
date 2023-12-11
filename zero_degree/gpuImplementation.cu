@@ -104,24 +104,20 @@ __global__ void detectBends(const float* __restrict__ pX, const float* __restric
                     / ((n*sumXSquared - (sumX*sumX))
                     * (n*sumYSquared - (sumY*sumY)));
 
-#ifdef PRINT_R_SQUARED
-    printf("%f, %f, %f, %f\n", s_x[threadIdx.x + pad], s_y[threadIdx.x + pad], s_z[threadIdx.x + pad], r_squared);
-#endif
-
     // Distance from previous point
     float dist = hypotf(s_x[threadIdx.x + pad] - s_x[threadIdx.x + pad - 1], s_y[threadIdx.x + pad] - s_y[threadIdx.x + pad - 1]);
 
-    // if(r_squared < R_SQUARED_THRESHOLD || dist >= DIST_TOLERANCE) {
-    //     KERN_DBG("[%d] Bend Detected (R^2=%f, Dist=%f)\n", idx, r_squared, dist);
-    // }
-    
+#ifdef PRINT_R_SQUARED
+    printf("%f, %f, %f, %f\n", s_x[threadIdx.x + pad], s_y[threadIdx.x + pad], s_z[threadIdx.x + pad], dist < DIST_TOLERANCE ? r_squared : 0);
+#endif
+
     bends[idx] = r_squared < R_SQUARED_THRESHOLD || dist >= DIST_TOLERANCE;
 }
 
 __global__ void filterValidSegments(uint32_t* __restrict__ lengths, const uint32_t* __restrict__ offsets, const uint8_t* __restrict__ bends, uint32_t numRuns) {
     int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
-    if(idx < numRuns && (bends[offsets[idx]] || lengths[idx] < MIN_SEGMENT_LENGTH)) {
-        lengths[idx] = 0;
+    if(idx < numRuns && (bends[offsets[idx]] || lengths[idx] <= MIN_SEGMENT_LENGTH)) {
+        lengths[idx] = 1;
     }
 }
 
@@ -131,7 +127,7 @@ __global__ void lengthsAndOffsetsToSegmentDescs(uint32_t* lengths, uint32_t* off
 
     if(idx < numInitialSegments) {
         segmentDescs[idx].segmentStart = offsets[idx];
-        segmentDescs[idx].segmentEnd = offsets[idx] + lengths[idx];
+        segmentDescs[idx].segmentEnd = offsets[idx] + lengths[idx] - 1;
     }
 }
 
@@ -162,11 +158,11 @@ void runLengthEncodeBends(uint8_t *d_bends, uint32_t *d_offsets, uint32_t *d_len
 }
 
 // CUB select operation which acts on segment_desc_t's
-// to remove segments of zero length
-struct NonZeroSegmentLength
+// to remove segments of length 1
+struct NonSingularSegmentLength
 {
     CUB_RUNTIME_FUNCTION __device__ __forceinline__
-    void NonZeroLength() {}
+    void NonSingularSegmentLength() {}
 
     CUB_RUNTIME_FUNCTION __device__ __forceinline__
     bool operator()(const segment_desc_t &a) const {
@@ -174,9 +170,9 @@ struct NonZeroSegmentLength
     }
 };
 
-// Condenses an array of segment_desc_t's to remove those with zero length
+// Condenses an array of segment_desc_t's to remove those with length 1
 void condenseSegments(segment_desc_t *segmentDescs, uint32_t *d_numSegments) {
-    NonZeroSegmentLength select_op;
+    NonSingularSegmentLength select_op;
 
     size_t cub_temp_storage_req = 0;
     cub::DeviceSelect::If(
@@ -206,6 +202,7 @@ void condenseSegments(segment_desc_t *segmentDescs, uint32_t *d_numSegments) {
 // Merges every even-or-odd indexed segment with the previous segment,
 // so long as the angles of the segments and distance between the segment endpoints
 // are within the tolerances specified in configuration.hpp
+
 template<bool odd>
 __global__ void mergeNeighboringSegments(segment_desc_t *segmentDescs, uint32_t numSegments, uint32_t *removedCount, const float* __restrict__ pX, const float* __restrict__ pY, const float* __restrict__ pZ) {
     int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
@@ -329,7 +326,7 @@ int planeExtract(float *pX, float *pY, float *pZ, uint32_t numPoints, segment_de
     // Step 4
     // Merge neihboring segments if they are similar enough, condensing between
     // merges that have removed items. Condensing is also done first no matter
-    // what, as there will be zero-length segments which were filtered out by
+    // what, as there will be single-length segments which were filtered out by
     // filterValidSegments
 
 #ifndef SKIP_SEGMENT_MERGING
