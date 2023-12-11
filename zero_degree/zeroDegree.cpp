@@ -12,6 +12,7 @@
 #include "cpuImplementation.hpp"
 #endif
 
+#include "configuration.hpp"
 #include "fileHandler.hpp"
 #include "dataFrame.hpp"
 #include "zeroDegree.hpp"
@@ -49,14 +50,20 @@ int main(int argc, char **argv) {
     segment_desc_t *segmentDescs;
     uint32_t numSegmentDesc = 0;
 
+    assert(dataFrameDesc.numPoints <= MAX_POINTS);
+
 #ifndef CPU_IMPLEMENTATION
     void *d_data;
     CHECK_CUDA(cudaHostRegister(mmapDesc.data, mmapDesc.size, cudaHostRegisterDefault | cudaHostRegisterMapped | cudaHostRegisterReadOnly));
     CHECK_CUDA(cudaHostGetDevicePointer((void**) &d_data, (void*) mmapDesc.data, 0));
 
+    CHECK_CUDA(cudaMallocManaged((void **) &segmentDescs, sizeof(segment_desc_t) * MAX_SEGMENTS, cudaMemAttachGlobal));
+
     float *d_px = (float *) ((char *) d_data + sizeof(uint32_t));
     float *d_py = (float *) ((char *) d_data + sizeof(uint32_t) + (sizeof(float) * dataFrameDesc.numPoints));
     float *d_pz = (float *) ((char *) d_data + sizeof(uint32_t) + (2 * sizeof(float) * dataFrameDesc.numPoints));
+
+    planeExtractAllocateTempMem();
 
     // Create CUDA timing events
     cudaEvent_t start;
@@ -65,9 +72,11 @@ int main(int argc, char **argv) {
     CHECK_CUDA(cudaEventCreate(&stop));
 
     CHECK_CUDA(cudaEventRecord(start));
-    planeExtract(d_px, d_py, d_pz, dataFrameDesc.numPoints, &segmentDescs, &numSegmentDesc);
+    planeExtract(d_px, d_py, d_pz, dataFrameDesc.numPoints, segmentDescs, &numSegmentDesc);
     CHECK_CUDA(cudaEventRecord(stop));
     CHECK_CUDA(cudaEventSynchronize(stop));
+
+    planeExtractFreeTempMem();
 
     float ms;
     CHECK_CUDA(cudaEventElapsedTime(&ms, start, stop));

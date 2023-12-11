@@ -3,6 +3,10 @@
 
 // Configuration parameters
 
+#define MAX_POINTS 4096
+#define MAX_SEGMENTS (MAX_POINTS/2)
+#define CUB_TEMP_STORAGE_SIZE 2048
+
 // Threshold for R-squared convolution step
 #define R_SQUARED_THRESHOLD 0.90
 
