@@ -86,7 +86,7 @@ __global__ void detectBends(const float* __restrict__ pX, const float* __restric
     if(n > REG_MAX_CONV_POINTS)
         n = REG_MAX_CONV_POINTS;
 
-    // TO-DO: Check if this is actually necessary
+    // TODO: Check if this is actually necessary
     if(n % 2 == 0)
         n += 1;
 
@@ -200,8 +200,75 @@ void condenseSegments(segment_desc_t *segmentDescs, uint32_t *d_numSegments) {
     CHECK_CUDA(cudaFree(d_cubTempStorage));
 }
 
-uint32_t mergeSegments(segment_desc_t *segmentDescs, uint32_t *d_numSegments) {
-    return 0;
+template<bool odd>
+__global__ void mergeNeighboringSegments(segment_desc_t *segmentDescs, uint32_t numSegments, uint32_t *removedCount, const float* __restrict__ pX, const float* __restrict__ pY, const float* __restrict__ pZ) {
+    int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
+
+    int curIdx = (idx * 2) + (odd ? 1 : 0);
+
+    if(curIdx < numSegments) {
+        int prevIdx = (curIdx - 1) >= 0 ? curIdx - 1 : numSegments - 1;
+
+        segment_desc_t cur = segmentDescs[curIdx];
+        segment_desc_t prev = segmentDescs[prevIdx];
+
+        // TODO: Determine if this test is necessary
+        if(cur.segmentEnd != cur.segmentStart && prev.segmentStart != prev.segmentEnd) {
+
+            float x1 = pX[prev.segmentStart];
+            float y1 = pY[prev.segmentStart];
+            float x2 = pX[prev.segmentEnd];
+            float y2 = pY[prev.segmentEnd];
+
+            float x3 = pX[cur.segmentStart];
+            float y3 = pY[cur.segmentStart];
+            float x4 = pX[cur.segmentEnd];
+            float y4 = pY[cur.segmentEnd];
+
+            // Take dot product of (curEnd-curStart) and (nextEnd-nextStart)
+            float dot = (x2-x1)*(x4-x3) + (y2-y1)*(y4-y3);
+
+            // Equivilant to abs(cos(theta)), where theta is angle between the current segment and the next
+            float absCos = fabsf(dot/(hypotf(x2 - x1, y2 - y1) * hypotf(x4 - x3, y4 - y3)));
+
+            float dist = hypotf(x2 - x3, y2 - y3);
+
+            if(absCos > MERGE_ABS_COS_TOLERANCE && dist < DIST_TOLERANCE) {
+                // Combine previous segment with current
+                segmentDescs[prevIdx].segmentEnd = cur.segmentEnd;
+
+                // Remove current segment by setting its length to 0
+                segmentDescs[curIdx].segmentStart = cur.segmentEnd;
+
+                atomicAdd(removedCount, 1);
+            }
+
+        }
+    }
+}
+
+uint32_t mergeSegments(segment_desc_t *segmentDescs, uint32_t *d_numSegments, const float *pX, const float *pY, const float *pZ) {
+    uint32_t numOrigSegments = *d_numSegments;
+
+    uint32_t *numRemoved;
+    CHECK_CUDA(cudaMallocManaged((void **) &numRemoved, sizeof(uint32_t), cudaMemAttachGlobal));
+    *numRemoved = 0;
+
+    mergeNeighboringSegments<false><<<1, ((numOrigSegments/2) + 1)>>>(segmentDescs, numOrigSegments, numRemoved, pX, pY, pZ);
+    CHECK_CUDA(cudaPeekAtLastError());
+    CHECK_CUDA(cudaDeviceSynchronize());
+
+    mergeNeighboringSegments<true><<<1, ((numOrigSegments/2) + 1)>>>(segmentDescs, numOrigSegments, numRemoved, pX, pY, pZ);
+    CHECK_CUDA(cudaPeekAtLastError());
+    CHECK_CUDA(cudaDeviceSynchronize());
+
+
+    uint32_t totalRemoved = *numRemoved;
+    printf("Removed %u!\n", totalRemoved);
+
+    CHECK_CUDA(cudaFree(numRemoved));
+
+    return totalRemoved;
 }
 
 
@@ -249,10 +316,14 @@ int planeExtract(float *pX, float *pY, float *pZ, uint32_t numPoints, segment_de
     CHECK_CUDA(cudaFree(d_offsets));
     CHECK_CUDA(cudaFree(d_lengths));
 
+#ifndef SKIP_SEGMENT_MERGING
     // Condense segments so long as merging reduces the number of segments
     do {
         condenseSegments(*segmentDescs, d_numSegments);
-    } while(mergeSegments(*segmentDescs, d_numSegments));
+    } while(mergeSegments(*segmentDescs, d_numSegments, pX, pY, pZ));
+#else
+    condenseSegments(*segmentDescs, d_numSegments);
+#endif
 
     CHECK_CUDA(cudaFree(d_numSegments));
 
