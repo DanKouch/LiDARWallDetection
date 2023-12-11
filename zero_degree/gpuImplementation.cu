@@ -3,6 +3,8 @@
 #include <cstdio>
 #include <assert.h>
 #include <cuda.h>
+#include <cub/device/device_run_length_encode.cuh>
+#include <cub/device/device_select.cuh>
 
 #include "zeroDegree.hpp"
 #include "configuration.hpp"
@@ -71,9 +73,68 @@ __global__ void detectBends(const float* __restrict__ pX, const float* __restric
 
     __syncthreads();
 
-    // TODO: Perform r-squared convolution
-    bends[idx] = 0;
+    // Step 2 - Perform r-squared convolution
+    float sumXY = 0;
+    float sumX = 0;
+    float sumY = 0;
+    float sumXSquared = 0;
+    float sumYSquared = 0;
+
+    float radius = hypotf(s_x[threadIdx.x + pad], s_y[threadIdx.x + pad]);
+    int n = (int) (REG_POINTS_PER_INV_METER * (1/radius));
+
+    if(n > REG_MAX_CONV_POINTS)
+        n = REG_MAX_CONV_POINTS;
+
+    // TO-DO: Check if this is actually necessary
+    if(n % 2 == 0)
+        n += 1;
+
+    for(int k = -n/2; k <= n/2; k++) {
+        int convI = threadIdx.x + pad + k;
+
+        sumXY += s_x[convI] * s_y[convI];
+        sumX += s_x[convI];
+        sumY += s_y[convI];
+        sumXSquared += s_x[convI] * s_x[convI];
+        sumYSquared += s_y[convI] * s_y[convI];
+    }
+
+    float r_squared = ((n*sumXY - sumX*sumY)*(n*sumXY - sumX*sumY))
+                    / ((n*sumXSquared - (sumX*sumX))
+                    * (n*sumYSquared - (sumY*sumY)));
+
+#ifdef PRINT_R_SQUARED
+    printf("%f, %f, %f, %f\n", s_x[threadIdx.x + pad], s_y[threadIdx.x + pad], s_z[threadIdx.x + pad], r_squared);
+#endif
+
+    // Distance from previous point
+    float dist = hypotf(s_x[threadIdx.x + pad] - s_x[threadIdx.x + pad - 1], s_y[threadIdx.x + pad] - s_y[threadIdx.x + pad - 1]);
+
+    // if(r_squared < R_SQUARED_THRESHOLD || dist >= DIST_TOLERANCE) {
+    //     KERN_DBG("[%d] Bend Detected (R^2=%f, Dist=%f)\n", idx, r_squared, dist);
+    // }
+    
+    bends[idx] = r_squared < R_SQUARED_THRESHOLD || dist >= DIST_TOLERANCE;
 }
+
+__global__ void filterValidSegments(uint32_t* __restrict__ lengths, const uint32_t* __restrict__ offsets, const uint8_t* __restrict__ bends, uint32_t numRuns) {
+    int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
+    if(idx < numRuns && (bends[offsets[idx]] || lengths[idx] < MIN_SEGMENT_LENGTH)) {
+        lengths[idx] = 0;
+    }
+}
+
+// Transforms offset and length data to array-of-structures
+__global__ void lengthsAndOffsetsToSegmentDescs(uint32_t* lengths, uint32_t* offsets, segment_desc_t *segmentDescs, uint32_t numSegments) {
+    int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
+
+    if(idx < numSegments) {
+        segmentDescs[idx].segmentStart = offsets[idx];
+        segmentDescs[idx].segmentEnd = offsets[idx] + lengths[idx];
+    }
+}
+
 
 int planeExtract(float *pX, float *pY, float *pZ, uint32_t numPoints, segment_desc_t **segmentDescs, uint32_t *numSegmentDesc) {
     // Limit bounds of convolution to neighboring blocks
@@ -84,12 +145,78 @@ int planeExtract(float *pX, float *pY, float *pZ, uint32_t numPoints, segment_de
     uint8_t *d_bends;
     CHECK_CUDA(cudaMallocManaged((void **) &d_bends, sizeof(uint8_t) * numPoints, cudaMemAttachGlobal));
 
-    CHECK_CUDA(cudaMallocManaged((void **) segmentDescs, sizeof(segment_desc_t) * 1, cudaMemAttachGlobal));
-
     detectBends<<<num_blocks, THREADS_PER_BLOCK>>>(pX, pY, pZ, numPoints, d_bends);
     CHECK_CUDA(cudaPeekAtLastError());
     CHECK_CUDA(cudaDeviceSynchronize());
+
+    uint32_t *d_offsets;
+    uint32_t *d_lengths;
+    uint32_t *d_numRuns;
+
+    CHECK_CUDA(cudaMallocManaged((void **) &d_numRuns, sizeof(uint32_t), cudaMemAttachGlobal));
+
+    // Can get away with allocating numPoints/2 since lengths need to be at least 2
+    CHECK_CUDA(cudaMallocManaged((void **) &d_offsets, sizeof(uint32_t) * numPoints/2, cudaMemAttachGlobal));
+    CHECK_CUDA(cudaMallocManaged((void **) &d_lengths, sizeof(uint32_t) * numPoints/2, cudaMemAttachGlobal));
+
+    size_t cub_temp_storage_req = 0;
+    cub::DeviceRunLengthEncode::NonTrivialRuns(
+            NULL,
+            cub_temp_storage_req,
+            d_bends,
+            d_offsets,
+            d_lengths,
+            d_numRuns,
+            numPoints);
+
+    void *d_cubTempStorage;
+    CHECK_CUDA(cudaMallocManaged((void **) &d_cubTempStorage, cub_temp_storage_req, cudaMemAttachGlobal));
     
+    cub::DeviceRunLengthEncode::NonTrivialRuns(
+            d_cubTempStorage,
+            cub_temp_storage_req,
+            d_bends,
+            d_offsets,
+            d_lengths,
+            d_numRuns,
+            numPoints);
+
+    CHECK_CUDA(cudaFree(d_cubTempStorage));
+
+    uint32_t numSegments = *d_numRuns;
+
+    num_blocks = INTEGER_DIV_CEIL(numSegments, THREADS_PER_BLOCK);
+    filterValidSegments<<<num_blocks, THREADS_PER_BLOCK>>>(d_lengths, d_offsets, d_bends, numSegments);
+    CHECK_CUDA(cudaPeekAtLastError());
+    CHECK_CUDA(cudaDeviceSynchronize());
+
+    CHECK_CUDA(cudaFree(d_bends));
+
+    CHECK_CUDA(cudaMallocManaged((void **) segmentDescs, sizeof(segment_desc_t) * numSegments, cudaMemAttachGlobal));
+
+    lengthsAndOffsetsToSegmentDescs<<<num_blocks, THREADS_PER_BLOCK>>>(d_lengths, d_offsets, *segmentDescs, numSegments);
+    CHECK_CUDA(cudaPeekAtLastError());
+    CHECK_CUDA(cudaDeviceSynchronize());
+
+    // No longer needed, as their information is now in segmentDescs
+    CHECK_CUDA(cudaFree(d_offsets));
+    CHECK_CUDA(cudaFree(d_lengths));
+
+    uint32_t validSegments = 0;
+    for(uint32_t i = 0; i < numSegments; i++) {
+        if((*segmentDescs)[i].segmentEnd - (*segmentDescs)[i].segmentStart) {
+            printf("-> [%u] %u -> %u\n", i, (*segmentDescs)[i].segmentStart, (*segmentDescs)[i].segmentEnd);
+            validSegments ++;
+        }
+    }
+
+    printf("%u valid runs (%u total)\n", validSegments, numSegments);
+
+    // TODO: Merge neighboring segments somehow
+    // TODO: Remove all segments of length zero using CUB device select
+    
+    CHECK_CUDA(cudaFree(d_numRuns));
+
     *numSegmentDesc = 0;
 
     return 0;
