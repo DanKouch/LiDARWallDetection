@@ -161,6 +161,8 @@ void runLengthEncodeBends(uint8_t *d_bends, uint32_t *d_offsets, uint32_t *d_len
     CHECK_CUDA(cudaFree(d_cubTempStorage));
 }
 
+// CUB select operation which acts on segment_desc_t's
+// to remove segments of zero length
 struct NonZeroSegmentLength
 {
     CUB_RUNTIME_FUNCTION __device__ __forceinline__
@@ -172,6 +174,7 @@ struct NonZeroSegmentLength
     }
 };
 
+// Condenses an array of segment_desc_t's to remove those with zero length
 void condenseSegments(segment_desc_t *segmentDescs, uint32_t *d_numSegments) {
     NonZeroSegmentLength select_op;
 
@@ -200,6 +203,9 @@ void condenseSegments(segment_desc_t *segmentDescs, uint32_t *d_numSegments) {
     CHECK_CUDA(cudaFree(d_cubTempStorage));
 }
 
+// Merges every even-or-odd indexed segment with the previous segment,
+// so long as the angles of the segments and distance between the segment endpoints
+// are within the tolerances specified in configuration.hpp
 template<bool odd>
 __global__ void mergeNeighboringSegments(segment_desc_t *segmentDescs, uint32_t numSegments, uint32_t *removedCount, const float* __restrict__ pX, const float* __restrict__ pY, const float* __restrict__ pZ) {
     int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
@@ -240,6 +246,7 @@ __global__ void mergeNeighboringSegments(segment_desc_t *segmentDescs, uint32_t 
                 // Remove current segment by setting its length to 0
                 segmentDescs[curIdx].segmentStart = cur.segmentEnd;
 
+                // Keep track of how many segments have been removed
                 atomicAdd(removedCount, 1);
             }
 
@@ -262,9 +269,8 @@ uint32_t mergeSegments(segment_desc_t *segmentDescs, uint32_t *d_numSegments, co
     CHECK_CUDA(cudaPeekAtLastError());
     CHECK_CUDA(cudaDeviceSynchronize());
 
-
     uint32_t totalRemoved = *numRemoved;
-    printf("Removed %u!\n", totalRemoved);
+    printf("Removed %u segments in merge.\n", totalRemoved);
 
     CHECK_CUDA(cudaFree(numRemoved));
 
@@ -276,14 +282,17 @@ int planeExtract(float *pX, float *pY, float *pZ, uint32_t numPoints, segment_de
     // Limit bounds of convolution to neighboring blocks
     assert(REG_MAX_CONV_POINTS/2 <= THREADS_PER_BLOCK);
 
-    unsigned int num_blocks = INTEGER_DIV_CEIL(numPoints, THREADS_PER_BLOCK);
+    // Step 1 - Detect Bends Using R-Squared Convolution
 
     uint8_t *d_bends;
     CHECK_CUDA(cudaMallocManaged((void **) &d_bends, sizeof(uint8_t) * numPoints, cudaMemAttachGlobal));
 
+    unsigned int num_blocks = INTEGER_DIV_CEIL(numPoints, THREADS_PER_BLOCK);
     detectBends<<<num_blocks, THREADS_PER_BLOCK>>>(pX, pY, pZ, numPoints, d_bends);
     CHECK_CUDA(cudaPeekAtLastError());
     CHECK_CUDA(cudaDeviceSynchronize());
+
+    // Step 2 - Do Run Length Encoding To Find Sequences of Straights and Bends
 
     uint32_t *d_offsets;
     uint32_t *d_lengths;
@@ -299,6 +308,8 @@ int planeExtract(float *pX, float *pY, float *pZ, uint32_t numPoints, segment_de
 
     uint32_t numInitialSegments = *d_numSegments;
 
+    // Step 3 - Filter segments to those corresponding to straight lines above a specified length
+
     num_blocks = INTEGER_DIV_CEIL(numInitialSegments, THREADS_PER_BLOCK);
     filterValidSegments<<<num_blocks, THREADS_PER_BLOCK>>>(d_lengths, d_offsets, d_bends, numInitialSegments);
     CHECK_CUDA(cudaPeekAtLastError());
@@ -306,15 +317,20 @@ int planeExtract(float *pX, float *pY, float *pZ, uint32_t numPoints, segment_de
 
     CHECK_CUDA(cudaFree(d_bends));
 
+    // Convert the lengths and offsets arrays into an array of segment_desc_t
     CHECK_CUDA(cudaMallocManaged((void **) segmentDescs, sizeof(segment_desc_t) * numInitialSegments, cudaMemAttachGlobal));
-
     lengthsAndOffsetsToSegmentDescs<<<num_blocks, THREADS_PER_BLOCK>>>(d_lengths, d_offsets, *segmentDescs, numInitialSegments);
     CHECK_CUDA(cudaPeekAtLastError());
     CHECK_CUDA(cudaDeviceSynchronize());
 
-    // No longer needed, as their information is now in segmentDescs
     CHECK_CUDA(cudaFree(d_offsets));
     CHECK_CUDA(cudaFree(d_lengths));
+
+    // Step 4
+    // Merge neihboring segments if they are similar enough, condensing between
+    // merges that have removed items. Condensing is also done first no matter
+    // what, as there will be zero-length segments which were filtered out by
+    // filterValidSegments
 
 #ifndef SKIP_SEGMENT_MERGING
     // Condense segments so long as merging reduces the number of segments
@@ -325,9 +341,10 @@ int planeExtract(float *pX, float *pY, float *pZ, uint32_t numPoints, segment_de
     condenseSegments(*segmentDescs, d_numSegments);
 #endif
 
-    CHECK_CUDA(cudaFree(d_numSegments));
-
+    // Update the caller's value for number of segments
     *numSegmentDesc = *d_numSegments;
+
+    CHECK_CUDA(cudaFree(d_numSegments));
 
     return 0;
 }
