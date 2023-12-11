@@ -19,7 +19,6 @@ mkdir -p out/
 rm -f out/out.csv
 rm -f ./zeroDegree
 
-nvcc zeroDegree.cpp fileHandler.cpp dataFrame.cpp gpuImplementation.cu -Xcompiler -Wall -Xcompiler -O3 -DPRINT_INDICES --use_fast_math -std=c++17 -o zeroDegree
+nvcc zeroDegree.cpp fileHandler.cpp dataFrame.cpp gpuImplementation.cu -Xcompiler -Wall -Xptxas -O3 -Xcompiler -O3 -DPRINT_INDICES --use_fast_math -std=c++17 -o zeroDegree
 
 ./zeroDegree out/out.csv $BIN_FILE
-

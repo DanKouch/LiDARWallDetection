@@ -5,6 +5,7 @@
 
 #ifndef CPU_IMPLEMENTATION
 #include <cuda.h>
+#include <cuda_profiler_api.h>
 #include "cudaUtil.cuh"
 #include "gpuImplementation.cuh"
 #else
@@ -53,15 +54,25 @@ int main(int argc, char **argv) {
     assert(dataFrameDesc.numPoints <= MAX_POINTS);
 
 #ifndef CPU_IMPLEMENTATION
-    void *d_data;
+
+    void *d_points;
+#ifdef USE_UVM_POINT_DATA
     CHECK_CUDA(cudaHostRegister(mmapDesc.data, mmapDesc.size, cudaHostRegisterDefault | cudaHostRegisterMapped | cudaHostRegisterReadOnly));
-    CHECK_CUDA(cudaHostGetDevicePointer((void**) &d_data, (void*) mmapDesc.data, 0));
+    CHECK_CUDA(cudaHostGetDevicePointer((void**) &d_points, (void*) mmapDesc.data, 0));
+
+    float *d_px = (float *) ((char *) d_points + sizeof(uint32_t));
+    float *d_py = (float *) ((char *) d_points + sizeof(uint32_t) + (sizeof(float) * dataFrameDesc.numPoints));
+    float *d_pz = (float *) ((char *) d_points + sizeof(uint32_t) + (2 * sizeof(float) * dataFrameDesc.numPoints));
+#else
+    CHECK_CUDA(cudaMallocManaged((void **) &d_points, sizeof(float) * dataFrameDesc.numPoints * 3, cudaMemAttachGlobal));
+    CHECK_CUDA(cudaMemcpy(d_points, (void *) (((uint32_t *) mmapDesc.data) + 1), sizeof(float) * dataFrameDesc.numPoints * 3, cudaMemcpyHostToDevice));
+
+    float *d_px = (float *) d_points;
+    float *d_py = (float *) ((char *) d_points + (sizeof(float) * dataFrameDesc.numPoints));
+    float *d_pz = (float *) ((char *) d_points + (2 * sizeof(float) * dataFrameDesc.numPoints));
+#endif
 
     CHECK_CUDA(cudaMallocManaged((void **) &segmentDescs, sizeof(segment_desc_t) * MAX_SEGMENTS, cudaMemAttachGlobal));
-
-    float *d_px = (float *) ((char *) d_data + sizeof(uint32_t));
-    float *d_py = (float *) ((char *) d_data + sizeof(uint32_t) + (sizeof(float) * dataFrameDesc.numPoints));
-    float *d_pz = (float *) ((char *) d_data + sizeof(uint32_t) + (2 * sizeof(float) * dataFrameDesc.numPoints));
 
     planeExtractAllocateTempMem();
 
@@ -71,17 +82,24 @@ int main(int argc, char **argv) {
     CHECK_CUDA(cudaEventCreate(&start));
     CHECK_CUDA(cudaEventCreate(&stop));
 
+    cudaProfilerStart();
     CHECK_CUDA(cudaEventRecord(start));
     planeExtract(d_px, d_py, d_pz, dataFrameDesc.numPoints, segmentDescs, &numSegmentDesc);
     CHECK_CUDA(cudaEventRecord(stop));
     CHECK_CUDA(cudaEventSynchronize(stop));
+    cudaProfilerStop();
 
     planeExtractFreeTempMem();
 
     float ms;
     CHECK_CUDA(cudaEventElapsedTime(&ms, start, stop));
 
+#ifdef USE_UVM_POINT_DATA
     CHECK_CUDA(cudaHostUnregister(mmapDesc.data));
+#else
+    CHECK_CUDA(cudaFree(d_points));
+#endif
+
 #else
     segmentDescs = (segment_desc_t *) malloc(sizeof(segmentDescs) * MAX_SEGMENT_DESC);
 
