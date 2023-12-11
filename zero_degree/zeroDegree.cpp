@@ -8,6 +8,7 @@
 #include "cudaUtil.cuh"
 #include "gpuImplementation.cuh"
 #else
+#include <chrono>
 #include "cpuImplementation.hpp"
 #endif
 
@@ -57,13 +58,35 @@ int main(int argc, char **argv) {
     float *d_py = (float *) ((char *) d_data + sizeof(uint32_t) + (sizeof(float) * dataFrameDesc.numPoints));
     float *d_pz = (float *) ((char *) d_data + sizeof(uint32_t) + (2 * sizeof(float) * dataFrameDesc.numPoints));
 
+    // Create CUDA timing events
+    cudaEvent_t start;
+    cudaEvent_t stop;
+    CHECK_CUDA(cudaEventCreate(&start));
+    CHECK_CUDA(cudaEventCreate(&stop));
+
+    CHECK_CUDA(cudaEventRecord(start));
     planeExtract(d_px, d_py, d_pz, dataFrameDesc.numPoints, &segmentDescs, &numSegmentDesc);
+    CHECK_CUDA(cudaEventRecord(stop));
+    CHECK_CUDA(cudaEventSynchronize(stop));
+
+    float ms;
+    CHECK_CUDA(cudaEventElapsedTime(&ms, start, stop));
 
     CHECK_CUDA(cudaHostUnregister(mmapDesc.data));
 #else
     segmentDescs = (segment_desc_t *) malloc(sizeof(segmentDescs) * MAX_SEGMENT_DESC);
+
+    chrono::high_resolution_clock::time_point start;
+    chrono::high_resolution_clock::time_point end;
+
+    start = chrono::high_resolution_clock::now();
     cpuPlaneExtract(&dataFrameDesc, segmentDescs, MAX_SEGMENT_DESC, &numSegmentDesc);
+    end = chrono::high_resolution_clock::now();
+
+    float ms = (chrono::duration_cast<chrono::duration<float, std::milli>> (end-start)).count();
 #endif
+
+    printf("Took %f ms.\n", ms);
 
 #ifndef PRINT_R_SQUARED
 #ifdef PRINT_INDICES
