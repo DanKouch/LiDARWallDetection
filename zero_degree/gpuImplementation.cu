@@ -126,13 +126,52 @@ __global__ void filterValidSegments(uint32_t* __restrict__ lengths, const uint32
 }
 
 // Transforms offset and length data to array-of-structures
-__global__ void lengthsAndOffsetsToSegmentDescs(uint32_t* lengths, uint32_t* offsets, segment_desc_t *segmentDescs, uint32_t numSegments) {
+__global__ void lengthsAndOffsetsToSegmentDescs(uint32_t* lengths, uint32_t* offsets, segment_desc_t *segmentDescs, uint32_t numInitialSegments) {
     int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
 
-    if(idx < numSegments) {
+    if(idx < numInitialSegments) {
         segmentDescs[idx].segmentStart = offsets[idx];
         segmentDescs[idx].segmentEnd = offsets[idx] + lengths[idx];
     }
+}
+
+struct NonZeroSegmentLength
+{
+    CUB_RUNTIME_FUNCTION __device__ __forceinline__
+    void NonZeroLength() {}
+
+    CUB_RUNTIME_FUNCTION __device__ __forceinline__
+    bool operator()(const segment_desc_t &a) const {
+        return a.segmentStart != a.segmentEnd;
+    }
+};
+
+void condenseSegments(segment_desc_t *segmentDescs, uint32_t *d_numSegments) {
+    NonZeroSegmentLength select_op;
+
+    size_t cub_temp_storage_req = 0;
+    cub::DeviceSelect::If(
+            NULL,
+            cub_temp_storage_req,
+            segmentDescs,
+            segmentDescs,
+            d_numSegments,
+            *d_numSegments,
+            select_op);
+
+    void *d_cubTempStorage;
+    CHECK_CUDA(cudaMalloc((void **) &d_cubTempStorage, cub_temp_storage_req));
+
+    cub::DeviceSelect::If(
+            d_cubTempStorage,
+            cub_temp_storage_req,
+            segmentDescs,
+            segmentDescs,
+            d_numSegments,
+            *d_numSegments,
+            select_op);
+
+    CHECK_CUDA(cudaFree(d_cubTempStorage));
 }
 
 
@@ -151,9 +190,9 @@ int planeExtract(float *pX, float *pY, float *pZ, uint32_t numPoints, segment_de
 
     uint32_t *d_offsets;
     uint32_t *d_lengths;
-    uint32_t *d_numRuns;
+    uint32_t *d_numSegments;
 
-    CHECK_CUDA(cudaMallocManaged((void **) &d_numRuns, sizeof(uint32_t), cudaMemAttachGlobal));
+    CHECK_CUDA(cudaMallocManaged((void **) &d_numSegments, sizeof(uint32_t), cudaMemAttachGlobal));
 
     // Can get away with allocating numPoints/2 since lengths need to be at least 2
     CHECK_CUDA(cudaMallocManaged((void **) &d_offsets, sizeof(uint32_t) * numPoints/2, cudaMemAttachGlobal));
@@ -166,7 +205,7 @@ int planeExtract(float *pX, float *pY, float *pZ, uint32_t numPoints, segment_de
             d_bends,
             d_offsets,
             d_lengths,
-            d_numRuns,
+            d_numSegments,
             numPoints);
 
     void *d_cubTempStorage;
@@ -178,23 +217,23 @@ int planeExtract(float *pX, float *pY, float *pZ, uint32_t numPoints, segment_de
             d_bends,
             d_offsets,
             d_lengths,
-            d_numRuns,
+            d_numSegments,
             numPoints);
 
     CHECK_CUDA(cudaFree(d_cubTempStorage));
 
-    uint32_t numSegments = *d_numRuns;
+    uint32_t numInitialSegments = *d_numSegments;
 
-    num_blocks = INTEGER_DIV_CEIL(numSegments, THREADS_PER_BLOCK);
-    filterValidSegments<<<num_blocks, THREADS_PER_BLOCK>>>(d_lengths, d_offsets, d_bends, numSegments);
+    num_blocks = INTEGER_DIV_CEIL(numInitialSegments, THREADS_PER_BLOCK);
+    filterValidSegments<<<num_blocks, THREADS_PER_BLOCK>>>(d_lengths, d_offsets, d_bends, numInitialSegments);
     CHECK_CUDA(cudaPeekAtLastError());
     CHECK_CUDA(cudaDeviceSynchronize());
 
     CHECK_CUDA(cudaFree(d_bends));
 
-    CHECK_CUDA(cudaMallocManaged((void **) segmentDescs, sizeof(segment_desc_t) * numSegments, cudaMemAttachGlobal));
+    CHECK_CUDA(cudaMallocManaged((void **) segmentDescs, sizeof(segment_desc_t) * numInitialSegments, cudaMemAttachGlobal));
 
-    lengthsAndOffsetsToSegmentDescs<<<num_blocks, THREADS_PER_BLOCK>>>(d_lengths, d_offsets, *segmentDescs, numSegments);
+    lengthsAndOffsetsToSegmentDescs<<<num_blocks, THREADS_PER_BLOCK>>>(d_lengths, d_offsets, *segmentDescs, numInitialSegments);
     CHECK_CUDA(cudaPeekAtLastError());
     CHECK_CUDA(cudaDeviceSynchronize());
 
@@ -202,22 +241,13 @@ int planeExtract(float *pX, float *pY, float *pZ, uint32_t numPoints, segment_de
     CHECK_CUDA(cudaFree(d_offsets));
     CHECK_CUDA(cudaFree(d_lengths));
 
-    uint32_t validSegments = 0;
-    for(uint32_t i = 0; i < numSegments; i++) {
-        if((*segmentDescs)[i].segmentEnd - (*segmentDescs)[i].segmentStart) {
-            printf("-> [%u] %u -> %u\n", i, (*segmentDescs)[i].segmentStart, (*segmentDescs)[i].segmentEnd);
-            validSegments ++;
-        }
-    }
-
-    printf("%u valid runs (%u total)\n", validSegments, numSegments);
-
     // TODO: Merge neighboring segments somehow
-    // TODO: Remove all segments of length zero using CUB device select
-    
-    CHECK_CUDA(cudaFree(d_numRuns));
 
-    *numSegmentDesc = 0;
+    condenseSegments(*segmentDescs, d_numSegments);
+    
+    CHECK_CUDA(cudaFree(d_numSegments));
+
+    *numSegmentDesc = *d_numSegments;
 
     return 0;
 }
