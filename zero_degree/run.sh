@@ -16,10 +16,10 @@ module load gcc/11.3.0
 BIN_FILE=../sample_input/zero_deg_only/ehall_1800_back/bin/frame_0.zeroDeg.bin
 
 mkdir -p out/
-
+rm -f out/out.csv
 rm -f ./zeroDegree
 
 nvcc zeroDegree.cpp fileHandler.cpp dataFrame.cpp gpuImplementation.cu -Xcompiler -Wall -Xcompiler -O3 -DPRINT_INDICES --use_fast_math -std=c++17 -o zeroDegree
 
-./zeroDegree $BIN_FILE
+./zeroDegree out/out.csv $BIN_FILE
 

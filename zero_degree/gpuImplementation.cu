@@ -162,7 +162,7 @@ void runLengthEncodeBends(uint8_t *d_bends, uint32_t *d_offsets, uint32_t *d_len
 struct NonSingularSegmentLength
 {
     CUB_RUNTIME_FUNCTION __device__ __forceinline__
-    void NonSingularSegmentLength() {}
+    NonSingularSegmentLength() {}
 
     CUB_RUNTIME_FUNCTION __device__ __forceinline__
     bool operator()(const segment_desc_t &a) const {

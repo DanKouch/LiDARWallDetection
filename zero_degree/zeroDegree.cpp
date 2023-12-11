@@ -17,20 +17,28 @@
 
 using namespace std;
 
-#define USAGE_STRING "./planeExtraction [fileName]"
+#define USAGE_STRING "./planeExtraction [outputFile] [inputFile]"
 
 #define MAX_SEGMENT_DESC 500
 
 int main(int argc, char **argv) {
-    if(argc != 2) {
+    if(argc != 3) {
         fprintf(stderr, "Error: Invalid usage.\n%s\n", USAGE_STRING);
         return -1;
     }
 
-    char *fileName = argv[1];
-    
+    char *outputFileName = argv[1];
+    char *inputFileName = argv[2];
+
+    // Open output file
+    FILE *outputFile = fopen(outputFileName, "w");
+    if(outputFile == NULL) {
+        fprintf(stderr, "Error: Could not open/create output file '%s'\n", outputFileName);
+    }
+
+    // Memory map input file
     mmap_descriptor_t mmapDesc;
-    if(mmap_file(fileName, &mmapDesc) != 0) {
+    if(mmap_file(inputFileName, &mmapDesc) != 0) {
         return -1;
     }
 
@@ -62,7 +70,7 @@ int main(int argc, char **argv) {
     // Print segment indices in csv format
     // segment_start_index, segment_end_index
     for(uint32_t i = 0; i < numSegmentDesc; i++) {
-        printf("%u, %u\n", segmentDescs[i].segmentStart, segmentDescs[i].segmentEnd);
+        fprintf(outputFile, "%u, %u\n", segmentDescs[i].segmentStart, segmentDescs[i].segmentEnd);
     }
 #else
     // Print segments in csv format
@@ -70,7 +78,7 @@ int main(int argc, char **argv) {
     for(uint32_t i = 0; i < numSegmentDesc; i++) {
         uint32_t start = segmentDescs[i].segmentStart;
         uint32_t end = segmentDescs[i].segmentEnd;
-        printf("%f, %f, %f, %f\n", dataFrameDesc.x[start], dataFrameDesc.y[start],
+        fprintf(outputFile, "%f, %f, %f, %f\n", dataFrameDesc.x[start], dataFrameDesc.y[start],
                                    dataFrameDesc.x[end], dataFrameDesc.y[end]);
     }
 #endif
@@ -81,6 +89,8 @@ int main(int argc, char **argv) {
 #else
     free(segmentDescs);
 #endif
+
+    fclose(outputFile);
 
     if(unmmap_file(&mmapDesc) != 0) {
         return -1;
