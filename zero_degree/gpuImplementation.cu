@@ -190,9 +190,6 @@ void condenseSegments(segment_desc_t *segmentDescs, uint32_t *d_numSegments) {
             d_numSegments,
             *d_numSegments,
             select_op);
-
-    CHECK_CUDA(cudaPeekAtLastError());
-    CHECK_CUDA(cudaDeviceSynchronize());
 }
 
 // Merges every even-or-odd indexed segment with the previous segment,
@@ -256,10 +253,9 @@ uint32_t mergeSegments(segment_desc_t *segmentDescs, uint32_t *d_numSegments, co
 
     mergeNeighboringSegments<false><<<1, ((numOrigSegments/2) + 1)>>>(segmentDescs, numOrigSegments, numRemoved, pX, pY, pZ);
     CHECK_CUDA(cudaPeekAtLastError());
-    CHECK_CUDA(cudaDeviceSynchronize());
-
     mergeNeighboringSegments<true><<<1, ((numOrigSegments/2) + 1)>>>(segmentDescs, numOrigSegments, numRemoved, pX, pY, pZ);
     CHECK_CUDA(cudaPeekAtLastError());
+
     CHECK_CUDA(cudaDeviceSynchronize());
 
     uint32_t totalRemoved = *numRemoved;

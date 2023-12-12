@@ -64,7 +64,7 @@ int main(int argc, char **argv) {
     float *d_py = (float *) ((char *) d_points + sizeof(uint32_t) + (sizeof(float) * dataFrameDesc.numPoints));
     float *d_pz = (float *) ((char *) d_points + sizeof(uint32_t) + (2 * sizeof(float) * dataFrameDesc.numPoints));
 #else
-    CHECK_CUDA(cudaMallocManaged((void **) &d_points, sizeof(float) * dataFrameDesc.numPoints * 3, cudaMemAttachGlobal));
+    CHECK_CUDA(cudaMalloc((void **) &d_points, sizeof(float) * dataFrameDesc.numPoints * 3));
     CHECK_CUDA(cudaMemcpy(d_points, (void *) (((uint32_t *) mmapDesc.data) + 1), sizeof(float) * dataFrameDesc.numPoints * 3, cudaMemcpyHostToDevice));
 
     float *d_px = (float *) d_points;
