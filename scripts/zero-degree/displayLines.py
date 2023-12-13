@@ -17,8 +17,9 @@ args = parser.parse_args()
 with open(args.csvFile, "r") as file:
     csvReader = csv.reader(file)
     data = np.array(list(csvReader))
-    p1 = data[:,[0,1]].astype(np.float32)
-    p2 = data[:,[2,3]].astype(np.float32)
+
+    p1 = data[:,[1,2]].astype(np.float32)
+    p2 = data[:,[3,4]].astype(np.float32)
 
     lines = list(map(lambda x, y: [x, y], list(map(tuple, p1)), list(map(tuple, p2))))
     colors = list(map(lambda line: mcol.hsv_to_rgb([np.random.rand(), 1, 1]), lines))

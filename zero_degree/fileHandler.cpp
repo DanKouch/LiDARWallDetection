@@ -7,6 +7,22 @@
 #include <errno.h>
 #include <cstring>
 #include <unistd.h>
+#include "configuration.hpp"
+
+#define LISTING_FILE_NAME "frameList.txt"
+
+FILE *getListingFile(const char *inputFileDir) {
+    char inputFileListingPath[PATH_MAX];
+    strncpy(inputFileListingPath, inputFileDir, PATH_MAX - strlen(LISTING_FILE_NAME) - 2);
+    strcat(inputFileListingPath, "/" LISTING_FILE_NAME);
+
+    FILE *outputFile = fopen(inputFileListingPath, "r");
+    if(outputFile == NULL) {
+        fprintf(stderr, "Error: Could not open input listing file.\n");
+    }
+
+    return outputFile;
+}
 
 int mmap_file(const char *filePath, mmap_descriptor_t *desc) {
     int fd = open(filePath, O_RDONLY, 0);

@@ -22,7 +22,7 @@ def getLinesFromIndexFile(indexFilePath, points):
     with open(indexFilePath, "r") as lineSegmentCsvFile:
         csvReader = csv.reader(lineSegmentCsvFile)
         data = np.array(list(csvReader))
-        lineSegmentIndices = data[:,[0,1]].astype(np.uint)
+        lineSegmentIndices = data[:,[1,2]].astype(np.uint)
 
         lines = list(map(lambda indices: [
                 tuple(points[indices[0]]),
