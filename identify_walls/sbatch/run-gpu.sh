@@ -1,23 +1,25 @@
 #!/usr/bin/env zsh
-#SBATCH --job-name=ZeroDegree
+#SBATCH --job-name=identifyWalls
 #SBATCH --partition=instruction
 #SBATCH --time=00-00:05:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
+#SBATCH --gres=gpu:1
 #SBATCH --mem=16G
-#SBATCH --output=ZeroDegree.out
+#SBATCH --output=IdentifyWalls.out
 
 cd $SLURM_SUBMIT_DIR
 
+module load nvidia/cuda/11.8.0
 module load gcc/11.3.0
 
 BIN_DIR=../sample_input/ehall_1800_back/bin/
 
 mkdir -p out/
 rm -f out/out.csv
-rm -f ./zeroDegree
+rm -f ./identifyWalls
 
-g++ zeroDegree.cpp fileHandler.cpp dataFrame.cpp cpuImplementation.cpp -Wall -O3 -ffast-math -std=c++17 -o zeroDegree
+nvcc identifyWalls.cpp fileHandler.cpp dataFrame.cpp gpuImplementation.cu -Xcompiler -Wall -Xptxas -O3 -Xcompiler -O3 --use_fast_math -std=c++17 -o identifyWalls
 
 # Ensure all input files are loaded into memory on our node
 # This is the more realistic scenerio, as a LiDAR would be able to
@@ -25,7 +27,7 @@ g++ zeroDegree.cpp fileHandler.cpp dataFrame.cpp cpuImplementation.cpp -Wall -O3
 # wait for disk access.
 for i in {0..3}
 do
-    ./zeroDegree /dev/null $BIN_DIR 0 > /dev/null
+    ./identifyWalls /dev/null $BIN_DIR 0 > /dev/null
 done
 
-./zeroDegree out/out.csv $BIN_DIR 0
+./identifyWalls out/out.csv $BIN_DIR 0

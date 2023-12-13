@@ -1,0 +1,8 @@
+identifyWalls
+*.png
+*.csv
+out/
+*.out
+*.nvprof
+remote*.sh
+*.tgz

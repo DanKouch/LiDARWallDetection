@@ -1,5 +1,5 @@
-#ifndef ZERO_DEGREE_HPP
-#define ZERO_DEGREE_HPP
+#ifndef IDENTIFY_WALLS_HPP
+#define IDENTIFY_WALLS_HPP
 
 #include <cstdint>
 

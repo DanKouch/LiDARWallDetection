@@ -17,11 +17,11 @@
 #include "configuration.hpp"
 #include "fileHandler.hpp"
 #include "dataFrame.hpp"
-#include "zeroDegree.hpp"
+#include "identifyWalls.hpp"
 
 using namespace std;
 
-#define USAGE_STRING "./planeExtraction [outputFile] [inputFileDirectory] [numFrames]"
+#define USAGE_STRING "./identifyWalls [outputFile] [inputFileDirectory] [numFrames]"
 
 #define MAX_SEGMENT_DESC 500
 
@@ -68,7 +68,7 @@ int processFrame(char *frameFilePath, char *frameName, FILE *outputFile, void *d
     CHECK_CUDA(cudaEventCreate(&stop));
 
     CHECK_CUDA(cudaEventRecord(start));
-    planeExtract(d_px, d_py, d_pz, dataFrameDesc.numPoints, segmentDescs, &numSegmentDesc);
+    identifyWalls(d_px, d_py, d_pz, dataFrameDesc.numPoints, segmentDescs, &numSegmentDesc);
     CHECK_CUDA(cudaEventRecord(stop));
     CHECK_CUDA(cudaEventSynchronize(stop));
 
@@ -84,7 +84,7 @@ int processFrame(char *frameFilePath, char *frameName, FILE *outputFile, void *d
     chrono::high_resolution_clock::time_point end;
 
     start = chrono::high_resolution_clock::now();
-    cpuPlaneExtract(&dataFrameDesc, segmentDescs, MAX_SEGMENT_DESC, &numSegmentDesc);
+    cpuidentifyWalls(&dataFrameDesc, segmentDescs, MAX_SEGMENT_DESC, &numSegmentDesc);
     end = chrono::high_resolution_clock::now();
 
     float ms = (chrono::duration_cast<chrono::duration<float, std::milli>> (end-start)).count();
@@ -151,7 +151,7 @@ int main(int argc, char **argv) {
 #ifdef __NVCC__
     CHECK_CUDA(cudaMalloc((void **) &d_points, sizeof(float) * MAX_POINTS * 3));
     CHECK_CUDA(cudaMallocManaged((void **) &segmentDescs, sizeof(segment_desc_t) * MAX_SEGMENTS, cudaMemAttachGlobal));
-    planeExtractAllocateTempMem();
+    identifyWallsAllocateTempMem();
 #else
     segmentDescs = (segment_desc_t *) malloc(sizeof(segmentDescs) * MAX_SEGMENT_DESC);
 #endif
@@ -188,7 +188,7 @@ int main(int argc, char **argv) {
     // Deallocate working memory for plane extraction
 #ifdef __NVCC__
     CHECK_CUDA(cudaFree(segmentDescs));
-    planeExtractFreeTempMem();
+    identifyWallsFreeTempMem();
     #ifndef USE_UVM_POINT_DATA
         CHECK_CUDA(cudaFree(d_points));
     #endif

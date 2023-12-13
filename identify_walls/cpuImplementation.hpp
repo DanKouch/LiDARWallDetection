@@ -4,9 +4,9 @@
 #define CPU_IMPLEMENTATION_HPP
 
 #include "dataFrame.hpp"
-#include "zeroDegree.hpp"
+#include "identifyWalls.hpp"
 
-int cpuPlaneExtract(data_frame_desc_t *desc, segment_desc_t *segmentDescs, uint32_t maxSegmentDesc, uint32_t *numSegmentDesc);
+int cpuidentifyWalls(data_frame_desc_t *desc, segment_desc_t *segmentDescs, uint32_t maxSegmentDesc, uint32_t *numSegmentDesc);
 
 void identifyStraightSegments(const data_frame_desc_t *desc, segment_desc_t segmentDescOut[], uint32_t maxSegmentDesc, uint32_t *numSegmentDesc);
 

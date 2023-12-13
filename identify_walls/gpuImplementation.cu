@@ -6,7 +6,7 @@
 #include <cub/device/device_run_length_encode.cuh>
 #include <cub/device/device_select.cuh>
 
-#include "zeroDegree.hpp"
+#include "identifyWalls.hpp"
 #include "configuration.hpp"
 
 #define DEBUG_KERNEL
@@ -25,7 +25,7 @@ uint32_t *d_numSegments;
 uint32_t *d_cubTempStorage;
 size_t cubTempStorageSize;
 
-void planeExtractAllocateTempMem() {
+void identifyWallsAllocateTempMem() {
     CHECK_CUDA(cudaMalloc((void **) &d_bends, sizeof(uint8_t) * MAX_POINTS));
     CHECK_CUDA(cudaMallocManaged((void **) &d_numSegments, sizeof(uint32_t), cudaMemAttachGlobal));
     CHECK_CUDA(cudaMalloc((void **) &d_offsets, sizeof(uint32_t) * MAX_SEGMENTS));
@@ -35,7 +35,7 @@ void planeExtractAllocateTempMem() {
     CHECK_CUDA(cudaMalloc((void **) &d_cubTempStorage, CUB_TEMP_STORAGE_SIZE));
 }
 
-void planeExtractFreeTempMem() {
+void identifyWallsFreeTempMem() {
     CHECK_CUDA(cudaFree(d_bends));
     CHECK_CUDA(cudaFree(d_numSegments));
     CHECK_CUDA(cudaFree(d_offsets));
@@ -279,7 +279,7 @@ __global__ void filterSegmentsByLength(segment_desc_t *segmentDescs, uint32_t nu
     }
 }
 
-int planeExtract(float *pX, float *pY, float *pZ, uint32_t numPoints, segment_desc_t *segmentDescs, uint32_t *numSegmentDesc) {
+int identifyWalls(float *pX, float *pY, float *pZ, uint32_t numPoints, segment_desc_t *segmentDescs, uint32_t *numSegmentDesc) {
     // Limit bounds of convolution to neighboring blocks
     assert(REG_MAX_CONV_POINTS/2 <= THREADS_PER_BLOCK);
 

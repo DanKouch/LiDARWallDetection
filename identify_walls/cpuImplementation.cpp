@@ -7,10 +7,10 @@
 
 #include "configuration.hpp"
 #include "dataFrame.hpp"
-#include "zeroDegree.hpp"
+#include "identifyWalls.hpp"
 #include "cpuImplementation.hpp"
 
-int cpuPlaneExtract(data_frame_desc_t *desc, segment_desc_t *segmentDescs, uint32_t maxSegmentDesc, uint32_t *numSegmentDesc) {
+int cpuidentifyWalls(data_frame_desc_t *desc, segment_desc_t *segmentDescs, uint32_t maxSegmentDesc, uint32_t *numSegmentDesc) {
 
     // 1. Identify sraight segments by using linear regression in a convolution-like fashion,
     //    then extracting segments of at least a specified number of poiunts with r_squared values

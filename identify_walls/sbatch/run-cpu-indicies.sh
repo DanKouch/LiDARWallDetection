@@ -1,11 +1,11 @@
 #!/usr/bin/env zsh
-#SBATCH --job-name=ZeroDegree
+#SBATCH --job-name=identifyWalls
 #SBATCH --partition=instruction
 #SBATCH --time=00-00:05:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=16G
-#SBATCH --output=ZeroDegree.out
+#SBATCH --output=IdentifyWalls.out
 
 cd $SLURM_SUBMIT_DIR
 
@@ -15,9 +15,9 @@ BIN_DIR=../sample_input/ehall_1800_back/bin/
 
 mkdir -p out/
 rm -f out/out.csv
-rm -f ./zeroDegree
+rm -f ./identifyWalls
 
-g++ zeroDegree.cpp fileHandler.cpp dataFrame.cpp cpuImplementation.cpp -DPRINT_INDICES -Wall -O3 -ffast-math -std=c++17 -o zeroDegree
+g++ identifyWalls.cpp fileHandler.cpp dataFrame.cpp cpuImplementation.cpp -DPRINT_INDICES -Wall -O3 -ffast-math -std=c++17 -o identifyWalls
 
 # Ensure all input files are loaded into memory on our node
 # This is the more realistic scenerio, as a LiDAR would be able to
@@ -25,7 +25,7 @@ g++ zeroDegree.cpp fileHandler.cpp dataFrame.cpp cpuImplementation.cpp -DPRINT_I
 # wait for disk access.
 for i in {0..3}
 do
-    ./zeroDegree /dev/null $BIN_DIR 0 > /dev/null
+    ./identifyWalls /dev/null $BIN_DIR 0 > /dev/null
 done
 
-./zeroDegree out/out.csv $BIN_DIR 0
+./identifyWalls out/out.csv $BIN_DIR 0

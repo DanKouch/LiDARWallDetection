@@ -41,7 +41,7 @@ def getPointColor(index):
 pointsColors = list(map(getPointColor, range(len(points))))
 
 fig, ax = plt.subplots()
-#ax.scatter(points[:,0], points[:,1], color=[0, 0, 0, 0.1])
+ax.scatter(points[:,0], points[:,1], color=pointsColors)
 ax.add_collection(lc)
 ax.scatter(0, 0, marker="*", color="red", s=150)
 
