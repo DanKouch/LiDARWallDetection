@@ -25,7 +25,7 @@ g++ zeroDegree.cpp fileHandler.cpp dataFrame.cpp cpuImplementation.cpp -Wall -O3
 # wait for disk access.
 for i in {0..3}
 do
-    ./zeroDegree /dev/null $BIN_DIR 0
+    ./zeroDegree /dev/null $BIN_DIR 0 > /dev/null
 done
 
 ./zeroDegree out/out.csv $BIN_DIR 0

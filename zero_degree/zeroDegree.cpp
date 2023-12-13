@@ -133,8 +133,6 @@ int main(int argc, char **argv) {
         fprintf(stderr, "%s\n", USAGE_STRING);
     }
 
-    printf("NumFrames: %d\n", numFrames);
-
     // Open output file
     FILE *outputFile = fopen(outputFileName, "w");
     if(outputFile == NULL) {
@@ -143,8 +141,6 @@ int main(int argc, char **argv) {
 
 
     FILE *listingFd = getListingFile(inputFileDir);
-
-    printf("Input file dir: %s\n", inputFileDir);
 
     char inputFilePath[500];
     int framesCompleted = 0;

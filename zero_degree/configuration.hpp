@@ -39,4 +39,6 @@
 // be in meters.
 #define DIST_TOLERANCE 1.5
 
+#define MIN_FINAL_SEGMENT_LENGTH_M 0.5
+
 #endif

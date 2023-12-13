@@ -26,9 +26,13 @@ int cpuPlaneExtract(data_frame_desc_t *desc, segment_desc_t *segmentDescs, uint3
         // 3. Condense segment descriptors to remove entries that have been merged (which
         //    are marked by having length 1)
         condenseSegments(segmentDescs, numSegmentDesc);
-    }    
-#endif 
-    
+    }
+
+    // 4. Filter by minimum segment length
+    filterSegmentsByLength(desc, segmentDescs, *numSegmentDesc);
+    condenseSegments(segmentDescs, numSegmentDesc);
+#endif
+
     return 0;
 }
 
@@ -194,5 +198,21 @@ void condenseSegments(segment_desc_t segmentDesc[], uint32_t *numSegmentDesc) {
 
     *numSegmentDesc = newI;
 }
+
+void filterSegmentsByLength(const data_frame_desc_t *desc, segment_desc_t segmentDesc[], uint32_t numSegmentDesc) {
+    for(uint32_t i = 0; i < numSegmentDesc; i++) {
+        float x1 = desc->x[segmentDesc[i].segmentStart];
+        float y1 = desc->y[segmentDesc[i].segmentStart];
+        float x2 = desc->x[segmentDesc[i].segmentEnd];
+        float y2 = desc->y[segmentDesc[i].segmentEnd];
+
+        float length = sqrt(pow((x2 - x1), 2) + pow((y2 - y1), 2));
+
+        if(length < MIN_FINAL_SEGMENT_LENGTH_M) {
+            segmentDesc[i].segmentEnd = segmentDesc[i].segmentStart;
+        }
+    }
+}
+
 
 #endif

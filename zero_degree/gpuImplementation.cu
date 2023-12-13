@@ -136,7 +136,7 @@ __global__ void detectBends(const float* __restrict__ pX, const float* __restric
 
 __global__ void filterValidSegments(uint32_t* __restrict__ lengths, const uint32_t* __restrict__ offsets, const uint8_t* __restrict__ bends, uint32_t numRuns) {
     int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
-    if(idx < numRuns && (bends[offsets[idx]] || lengths[idx] <= MIN_SEGMENT_LENGTH)) {
+    if(idx < numRuns && (bends[offsets[idx]] || lengths[idx] < MIN_SEGMENT_LENGTH)) {
         lengths[idx] = 1;
     }
 }
@@ -160,9 +160,6 @@ void runLengthEncodeBends(uint8_t *d_bends, uint32_t *d_offsets, uint32_t *d_len
             d_lengths,
             d_numSegments,
             numPoints);
-
-    CHECK_CUDA(cudaPeekAtLastError());
-    CHECK_CUDA(cudaDeviceSynchronize());
 }
 
 // CUB select operation which acts on segment_desc_t's
@@ -265,6 +262,23 @@ uint32_t mergeSegments(segment_desc_t *segmentDescs, uint32_t *d_numSegments, co
     return totalRemoved;
 }
 
+__global__ void filterSegmentsByLength(segment_desc_t *segmentDescs, uint32_t numSegments, const float* __restrict__ pX, const float* __restrict__ pY, const float* __restrict__ pZ) {
+    int idx = (blockIdx.x * blockDim.x) + threadIdx.x;
+
+    if(idx < numSegments) {
+        segment_desc_t seg = segmentDescs[idx];
+
+        float x1 = pX[seg.segmentStart];
+        float y1 = pY[seg.segmentStart];
+        float x2 = pX[seg.segmentEnd];
+        float y2 = pY[seg.segmentEnd];
+
+        if(hypotf(x2 - x1, y2 - y1) < MIN_FINAL_SEGMENT_LENGTH_M) {
+            segmentDescs[idx].segmentEnd = segmentDescs[idx].segmentStart;
+        }
+    }
+}
+
 int planeExtract(float *pX, float *pY, float *pZ, uint32_t numPoints, segment_desc_t *segmentDescs, uint32_t *numSegmentDesc) {
     // Limit bounds of convolution to neighboring blocks
     assert(REG_MAX_CONV_POINTS/2 <= THREADS_PER_BLOCK);
@@ -272,11 +286,12 @@ int planeExtract(float *pX, float *pY, float *pZ, uint32_t numPoints, segment_de
     unsigned int num_blocks = INTEGER_DIV_CEIL(numPoints, THREADS_PER_BLOCK);
     detectBends<<<num_blocks, THREADS_PER_BLOCK>>>(pX, pY, pZ, numPoints, d_bends);
     CHECK_CUDA(cudaPeekAtLastError());
-    CHECK_CUDA(cudaDeviceSynchronize());
 
     // Step 2 - Do Run Length Encoding To Find Sequences of Straights and Bends
 
     runLengthEncodeBends(d_bends, d_offsets, d_lengths, d_numSegments, numPoints);
+    CHECK_CUDA(cudaPeekAtLastError());
+    CHECK_CUDA(cudaDeviceSynchronize());
 
     assert(*d_numSegments <= MAX_SEGMENTS);
 
@@ -285,13 +300,10 @@ int planeExtract(float *pX, float *pY, float *pZ, uint32_t numPoints, segment_de
     num_blocks = INTEGER_DIV_CEIL(*d_numSegments, THREADS_PER_BLOCK);
     filterValidSegments<<<num_blocks, THREADS_PER_BLOCK>>>(d_lengths, d_offsets, d_bends, *d_numSegments);
     CHECK_CUDA(cudaPeekAtLastError());
-    CHECK_CUDA(cudaDeviceSynchronize());
 
     // Convert the lengths and offsets arrays into an array of segment_desc_t
     lengthsAndOffsetsToSegmentDescs<<<num_blocks, THREADS_PER_BLOCK>>>(d_lengths, d_offsets, segmentDescs, *d_numSegments);
-    CHECK_CUDA(cudaPeekAtLastError());
-    CHECK_CUDA(cudaDeviceSynchronize());
-
+    
     // Step 4
     // Merge neihboring segments if they are similar enough, condensing between
     // merges that have removed items. Condensing is also done first no matter
@@ -301,10 +313,22 @@ int planeExtract(float *pX, float *pY, float *pZ, uint32_t numPoints, segment_de
 #ifndef SKIP_SEGMENT_MERGING
     // Condense segments so long as merging reduces the number of segments
     do {
+        CHECK_CUDA(cudaPeekAtLastError());
         condenseSegments(segmentDescs, d_numSegments);
+        CHECK_CUDA(cudaPeekAtLastError());
     } while(mergeSegments(segmentDescs, d_numSegments, pX, pY, pZ));
+
+    // Step 5 - Filter segments by minimum length
+    filterSegmentsByLength<<<1, *d_numSegments>>>(segmentDescs, *d_numSegments, pX, pY, pZ);
+    CHECK_CUDA(cudaPeekAtLastError());
+
+    condenseSegments(segmentDescs, d_numSegments);
+    
+    CHECK_CUDA(cudaPeekAtLastError());
+    CHECK_CUDA(cudaDeviceSynchronize());
 #else
     condenseSegments(segmentDescs, d_numSegments);
+    CHECK_CUDA(cudaPeekAtLastError());
 #endif
 
     // Update the caller's value for number of segments
