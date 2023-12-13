@@ -1,3 +1,10 @@
+/*
+* cudaUtil.cuh
+* 
+* ME759 Final Project
+* CUDA utility functions and macros
+*/
+
 #ifdef __NVCC__
 
 #ifndef CUDA_UTIL_CUH
@@ -7,6 +14,7 @@
 #include <cstdio>
 #include <cuda.h>
 
+// Kernel debug macros
 #ifdef DEBUG_KERNEL
 #define KERN_DBG(f, ...) printf("[B%d T%d]: " f, blockIdx.x, threadIdx.x, __VA_ARGS__)
 #else
@@ -16,7 +24,6 @@
 // Used this article: https://leimao.github.io/blog/Proper-CUDA-Error-Checking/
 // per @214.
 #define CHECK_CUDA(ret) checkCuda((ret), #ret, __FILE__, __LINE__)
-
 inline void checkCuda(cudaError_t ret, const char* const func, const char* const file, const int line) {
     if(ret != cudaSuccess) {
         fprintf(stderr, "CUDA Runtime Error at: %s:%d\n", file, line);

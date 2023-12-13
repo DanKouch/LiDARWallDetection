@@ -1,3 +1,10 @@
+/*
+* identifyWalls.cpu
+* 
+* ME759 Final Project
+* Main file for identifyWalls program.
+*/
+
 #include <cstdio>
 #include <cstdint>
 #include <cstring>
@@ -21,10 +28,122 @@
 
 using namespace std;
 
+/*
+Command Line Arguments:
+
+- outputFile is a .csv file that gets populated with the detected segments
+- inputFileDirectory is the directory that contains the input frame .bin files (as well as frameList.txt)
+- numFrames is the number of frames that should be processed (0 means all frames in frameList.txt should be processed)
+*/
 #define USAGE_STRING "./identifyWalls [outputFile] [inputFileDirectory] [numFrames]"
 
-#define MAX_SEGMENT_DESC 500
+/**
+* Main function (see USAGE_STRING for meaning of arguments)
+*/
+int main(int argc, char **argv) {
+    // Ensure we have the correct number of arguments
+    if(argc != 4) {
+        fprintf(stderr, "Error: Invalid usage.\n%s\n", USAGE_STRING);
+        return -1;
+    }
 
+    char *outputFileName = argv[1];
+    char *inputFileDir = argv[2];
+
+    // Get the number of frames
+    // Non-numeric arguments interpreted as 0
+    // If numFrames is zero, then all frames in the directory will be read
+    int numFrames = (int) atoi(argv[3]);
+    if(numFrames < 0) {
+        fprintf(stderr, "Usage Error: numFrames can't be negative.");
+        fprintf(stderr, "%s\n", USAGE_STRING);
+    }
+
+    // Open output file
+    FILE *outputFile = fopen(outputFileName, "w");
+    if(outputFile == NULL) {
+        fprintf(stderr, "Error: Could not open/create output file '%s'\n", outputFileName);
+    }
+
+    // Open the frame listing file, which contains a list of all
+    // frame files
+    FILE *listingFd = getListingFile(inputFileDir);
+
+    // Allocate working memory for plane extraction
+    void *d_points = NULL;
+    segment_desc_t *segmentDescs;
+#ifdef __NVCC__
+    CHECK_CUDA(cudaMalloc((void **) &d_points, sizeof(float) * MAX_POINTS * 3));
+    CHECK_CUDA(cudaMallocManaged((void **) &segmentDescs, sizeof(segment_desc_t) * MAX_SEGMENTS, cudaMemAttachGlobal));
+    identifyWallsAllocateTempMem();
+#else
+    segmentDescs = (segment_desc_t *) malloc(sizeof(segmentDescs) * MAX_SEGMENTS);
+#endif
+
+    chrono::high_resolution_clock::time_point start;
+    chrono::high_resolution_clock::time_point end;
+
+    char inputFilePath[500];
+    int framesCompleted = 0;
+
+    // Start timing for all-frame timer
+    start = chrono::high_resolution_clock::now();
+    char fileName[BIN_FILE_MAX_LENGTH];
+
+    // Loop through each line in the listing file
+    while (fgets(fileName, BIN_FILE_MAX_LENGTH, listingFd) != NULL) {
+        // Get rid of new line character
+        fileName[strlen(fileName) - 1] = 0;
+
+        // Grab the relative path associated with the input file
+        getInputFilePath(fileName, inputFileDir, inputFilePath);
+
+        // Process the frame
+        processFrame(inputFilePath, fileName, outputFile, d_points, segmentDescs);
+
+        if(++framesCompleted == numFrames && numFrames != 0)
+            break;
+    }
+    end = chrono::high_resolution_clock::now();
+
+    float ms = (chrono::duration_cast<chrono::duration<float, std::milli>> (end-start)).count();
+
+    printf("Took %f ms to process %d frames.\n", ms, framesCompleted);
+    printf("ms per Frame: %f, FPS: %f.\n", ms/framesCompleted, framesCompleted/(ms/1000));
+
+#ifdef __NVCC__
+    printf("Used GPU implementation.\n");
+#else
+    printf("Used CPU implementation.\n");
+#endif
+
+    // Deallocate working memory for plane extraction
+#ifdef __NVCC__
+    CHECK_CUDA(cudaFree(segmentDescs));
+    identifyWallsFreeTempMem();
+    #ifndef USE_UVM_POINT_DATA
+        CHECK_CUDA(cudaFree(d_points));
+    #endif
+#else
+    free(segmentDescs);
+#endif
+
+    fclose(listingFd);
+    fclose(outputFile);
+
+    return 0;
+}
+
+/**
+* Processes a frame of input located at frameFilePath, identifying walls and
+* printing out identified walls in the provided output file as CSV.
+*
+* frameFilePath - path of input file (.bin file)
+* frameName - Name of frame (can be just the file's name)
+* outputFile - File descriptor for CSV output
+* d_points - If compiled with nvcc, this should contain a pointer to an allocated space for point data. Otherwise can be NULL
+* segmentDescs - An allocated space to store segment descriptors
+*/
 int processFrame(char *frameFilePath, char *frameName, FILE *outputFile, void *d_points, segment_desc_t *segmentDescs) {
     assert(segmentDescs != NULL);
     #ifdef __NVCC__
@@ -84,7 +203,7 @@ int processFrame(char *frameFilePath, char *frameName, FILE *outputFile, void *d
     chrono::high_resolution_clock::time_point end;
 
     start = chrono::high_resolution_clock::now();
-    cpuidentifyWalls(&dataFrameDesc, segmentDescs, MAX_SEGMENT_DESC, &numSegmentDesc);
+    cpuIdentifyWalls(&dataFrameDesc, segmentDescs, MAX_SEGMENTS, &numSegmentDesc);
     end = chrono::high_resolution_clock::now();
 
     float ms = (chrono::duration_cast<chrono::duration<float, std::milli>> (end-start)).count();
@@ -117,89 +236,3 @@ int processFrame(char *frameFilePath, char *frameName, FILE *outputFile, void *d
 
     return 0;
 }
-
-int main(int argc, char **argv) {
-    if(argc != 4) {
-        fprintf(stderr, "Error: Invalid usage.\n%s\n", USAGE_STRING);
-        return -1;
-    }
-
-    char *outputFileName = argv[1];
-    char *inputFileDir = argv[2];
-
-    int numFrames = (int) atoi(argv[3]);
-    if(numFrames < 0) {
-        fprintf(stderr, "Usage Error: numFrames can't be negative.");
-        fprintf(stderr, "%s\n", USAGE_STRING);
-    }
-
-    // Open output file
-    FILE *outputFile = fopen(outputFileName, "w");
-    if(outputFile == NULL) {
-        fprintf(stderr, "Error: Could not open/create output file '%s'\n", outputFileName);
-    }
-
-
-    FILE *listingFd = getListingFile(inputFileDir);
-
-    char inputFilePath[500];
-    int framesCompleted = 0;
-
-    // Allocate working memory for plane extraction
-    void *d_points = NULL;
-    segment_desc_t *segmentDescs;
-#ifdef __NVCC__
-    CHECK_CUDA(cudaMalloc((void **) &d_points, sizeof(float) * MAX_POINTS * 3));
-    CHECK_CUDA(cudaMallocManaged((void **) &segmentDescs, sizeof(segment_desc_t) * MAX_SEGMENTS, cudaMemAttachGlobal));
-    identifyWallsAllocateTempMem();
-#else
-    segmentDescs = (segment_desc_t *) malloc(sizeof(segmentDescs) * MAX_SEGMENT_DESC);
-#endif
-
-    chrono::high_resolution_clock::time_point start;
-    chrono::high_resolution_clock::time_point end;
-
-    start = chrono::high_resolution_clock::now();
-    char fileName[BIN_FILE_MAX_LENGTH];
-    while (fgets(fileName, BIN_FILE_MAX_LENGTH, listingFd) != NULL) {
-        // Get rid of new line character
-        fileName[strlen(fileName) - 1] = 0;
-
-        getInputFilePath(fileName, inputFileDir, inputFilePath);
-
-        processFrame(inputFilePath, fileName, outputFile, d_points, segmentDescs);
-
-        if(++framesCompleted == numFrames && numFrames != 0)
-            break;
-    }
-    end = chrono::high_resolution_clock::now();
-
-    float ms = (chrono::duration_cast<chrono::duration<float, std::milli>> (end-start)).count();
-
-    printf("Took %f ms to process %d frames.\n", ms, framesCompleted);
-    printf("ms per Frame: %f, FPS: %f.\n", ms/framesCompleted, framesCompleted/(ms/1000));
-
-#ifdef __NVCC__
-    printf("Used GPU implementation.\n");
-#else
-    printf("Used CPU implementation.\n");
-#endif
-
-    // Deallocate working memory for plane extraction
-#ifdef __NVCC__
-    CHECK_CUDA(cudaFree(segmentDescs));
-    identifyWallsFreeTempMem();
-    #ifndef USE_UVM_POINT_DATA
-        CHECK_CUDA(cudaFree(d_points));
-    #endif
-#else
-    free(segmentDescs);
-#endif
-
-    fclose(listingFd);
-    fclose(outputFile);
-
-
-    return 0;
-}
-
