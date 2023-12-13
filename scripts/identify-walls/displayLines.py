@@ -27,7 +27,7 @@ with open(args.csvFile, "r") as file:
     p2 = data[:,[3,4]].astype(np.float32)
 
     lines = list(map(lambda x, y: [x, y], list(map(tuple, p1)), list(map(tuple, p2))))
-    colors = list(map(lambda line: mcol.hsv_to_rgb([np.random.rand(), 1, 1]), lines))
+    colors = list(map(lambda line: mcol.hsv_to_rgb([np.random.rand(), 1, 0.75]), lines))
 
     print("Displaying {} lines.".format(len(lines)))
 
