@@ -22,6 +22,7 @@ with open(args.csvFile, "r") as file:
     y = data[:,1].astype(np.float32)
     z = data[:,2].astype(np.float32)
     rSquared = data[:,3].astype(np.float32)
+    n = data[:,4]
 
     fig = plt.figure()
     fig.canvas.manager.set_window_title("CSV Data")
@@ -39,12 +40,15 @@ with open(args.csvFile, "r") as file:
     g = ax.scatter(x, y, c=colors)
     ax.scatter(0, 0, marker="*", color="red", s=150)
 
+    for i, n in enumerate(n):
+        ax.annotate("{}".format(n), (x[i], y[i]))
+
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
 
     plt.colorbar(mpl.cm.ScalarMappable(cmap=colormap), ax=ax)
-    
-    plt.show()
 
     if(args.outFile is not None):
         plt.savefig(args.outFile)
+    else:
+        plt.show()

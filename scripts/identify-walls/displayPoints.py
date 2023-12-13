@@ -27,7 +27,7 @@ ax.margins(0.1)
 ax.set_xlabel('X')
 ax.set_ylabel('Y')
 
-plt.show()
-
 if(args.outFile is not None):
     plt.savefig(args.outFile)
+else:
+    plt.show()

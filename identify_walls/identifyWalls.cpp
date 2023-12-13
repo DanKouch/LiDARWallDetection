@@ -68,6 +68,9 @@ int main(int argc, char **argv) {
     // Open the frame listing file, which contains a list of all
     // frame files
     FILE *listingFd = getListingFile(inputFileDir);
+    if(listingFd == NULL) {
+        return 1;
+    }
 
     // Allocate working memory for plane extraction
     void *d_points = NULL;

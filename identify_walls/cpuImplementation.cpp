@@ -81,7 +81,7 @@ void identifyStraightSegments(const data_frame_desc_t *desc, segment_desc_t segm
                         * (n*sumYSquared - pow(sumY, 2)));
 
 #ifdef PRINT_R_SQUARED
-        printf("%f, %f, %f, %f\n", desc->x[i], desc->y[i], desc->z[i], r_squared);
+        printf("%f, %f, %f, %f, %ld\n", desc->x[i], desc->y[i], desc->z[i], r_squared, n);
 #endif
 
         // Distance from previous point

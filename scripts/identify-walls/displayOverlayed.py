@@ -56,5 +56,5 @@ ax.set_ylabel('Y')
 
 if(args.outFile is not None):
     plt.savefig(args.outFile)
-
-plt.show()
+else:
+    plt.show()

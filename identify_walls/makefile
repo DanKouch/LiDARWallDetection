@@ -26,18 +26,17 @@ display-overlayed-cpu:
 	rm -f out/out.csv
 	g++ identifyWalls.cpp fileHandler.cpp dataFrame.cpp cpuImplementation.cpp -DPRINT_INDICES -Wall -O3 -ffast-math -std=c++17 -o identifyWalls
 	./identifyWalls out/out.csv $(binDir) 1
-	python3 ../scripts/identify-walls/displayOverlayed.py out/out.csv $(binDir)/frame_0.zeroDeg.bin --outFile out/overlayed.png
+	python3 ../scripts/identify-walls/displayOverlayed.py out/out.csv $(binDir)/frame_0.zeroDeg.bin --outFile out/overlayed$(comment).png
 
 display-overlayed-no-merge-cpu:
 	mkdir -p out/
 	rm -f out/out.csv
 	g++ identifyWalls.cpp fileHandler.cpp dataFrame.cpp cpuImplementation.cpp -DPRINT_INDICES -DSKIP_SEGMENT_MERGING -Wall -O3 -ffast-math -std=c++17 -o identifyWalls
 	./identifyWalls out/out.csv $(binDir) 1
-	python3 ../scripts/identify-walls/displayOverlayed.py out/out.csv $(binDir)/frame_0.zeroDeg.bin --outFile out/overlayed-no-merge.png
+	python3 ../scripts/identify-walls/displayOverlayed.py out/out.csv $(binDir)/frame_0.zeroDeg.bin --outFile out/overlayed-no-merge$(comment).png
 
 display-r-squared-cpu:
 	mkdir -p out/
 	rm -f out/out.csv
 	g++ identifyWalls.cpp fileHandler.cpp dataFrame.cpp cpuImplementation.cpp -DPRINT_R_SQUARED -DSKIP_SEGMENT_MERGING -Wall -O3 -ffast-math -std=c++17 -o identifyWalls
-	./identifyWalls out/out.csv $(binDir) 1
-	python3 ../scripts/identify-walls/displayRSquared.py out/out.csv --outFile out/r-squared.png
+	python3 ../scripts/identify-walls/displayRSquared.py <(./identifyWalls out/out.csv $(binDir) 1 | grep ", 0.0") --outFile out/r-squared$(comment).png

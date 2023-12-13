@@ -43,7 +43,7 @@ with open(args.csvFile, "r") as file:
     
     if(args.outFile is not None):
         plt.savefig(args.outFile)
-
-    plt.show()
+    else:
+        plt.show()
 
     
