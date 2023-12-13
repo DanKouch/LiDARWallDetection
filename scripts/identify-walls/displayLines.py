@@ -41,7 +41,9 @@ with open(args.csvFile, "r") as file:
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
     
-    plt.show()
-
     if(args.outFile is not None):
         plt.savefig(args.outFile)
+
+    plt.show()
+
+    
