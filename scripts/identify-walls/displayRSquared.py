@@ -14,6 +14,7 @@ parser = argparse.ArgumentParser(
 )
 parser.add_argument("csvFile", help="Path of .csv frame file to display.")
 parser.add_argument("--outFile", help="Path to write output figure to.")
+parser.add_argument("--title", help="Title of chart")
 args = parser.parse_args()
 
 threshold = 0.55
@@ -43,16 +44,15 @@ with open(args.csvFile, "r") as file:
     g = ax.scatter(x, y, c=colors)
     ax.scatter(0, 0, marker="*", color="red", s=150)
 
-    for i, n in enumerate(n):
-        ax.annotate("{}".format(n), (x[i], y[i]))
+    ax.set_xlabel('x (m) - Relative to LiDAR')
+    ax.set_ylabel('y (m) - Relative to LiDAR')
 
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
+    ax.set_title(args.title)
 
     plt.colorbar(mpl.cm.ScalarMappable(cmap=colormap), ax=ax)
 
     # Save the file if outFile specified, otherwise display it
     if(args.outFile is not None):
-        plt.savefig(args.outFile)
+        plt.savefig(args.outFile, dpi=300)
     else:
         plt.show()

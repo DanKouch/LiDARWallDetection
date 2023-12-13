@@ -8,6 +8,7 @@ from zeroDegreeBinUtils import *
 import matplotlib.pyplot as plt
 import matplotlib.collections as mc
 import matplotlib.colors as mcol
+import matplotlib.patheffects as pe
 
 # Get filename
 parser = argparse.ArgumentParser(
@@ -17,6 +18,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument("lineSegmentCsvFile", help="Path of .csv line segment file to display.")
 parser.add_argument("frameBinFile", help="Path of .bin frame file to display.")
 parser.add_argument("--outFile", help="Path to write output figure to.")
+parser.add_argument("--title", help="Title for plot")
 
 args = parser.parse_args()
 
@@ -45,21 +47,25 @@ def getPointColor(index):
 pointsColors = list(map(getPointColor, range(len(points))))
 
 fig, ax = plt.subplots()
-ax.scatter(points[:,0], points[:,1], color=pointsColors)
+pointMPL = ax.scatter(points[:,0], points[:,1], color=[0, 0, 0, 0.05])
 ax.add_collection(lc)
-ax.scatter(0, 0, marker="*", color="red", s=150)
+markerMPL = ax.scatter(0, 0, marker="*", color="red", s=150)
 
-for i, line in enumerate(lines):
-    ax.annotate("{}".format(i), line[0])
+ax.legend([pointMPL, markerMPL], ["Points (n={})".format(len(points)), "LiDAR"])
+
+# for i, line in enumerate(lines):
+#     ax.annotate("{}".format(i), line[0], annotation_clip=True)
 
 ax.autoscale()
 ax.margins(0.1)
 
-ax.set_xlabel('X')
-ax.set_ylabel('Y')
+ax.set_xlabel('x (m) - Relative to LiDAR')
+ax.set_ylabel('y (m) - Relative to LiDAR')
+
+ax.set_title(args.title)
 
 # Save the file if outFile specified, otherwise display it
 if(args.outFile is not None):
-    plt.savefig(args.outFile)
+    plt.savefig(args.outFile, dpi=300)
 else:
     plt.show()

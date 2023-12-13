@@ -12,6 +12,7 @@ parser = argparse.ArgumentParser(
 
 parser.add_argument("frameBinFile", help="Path of .bin frame file to display.")
 parser.add_argument("--outFile", help="Path to write output figure to.")
+parser.add_argument("--title", help="Title of chart.")
 
 args = parser.parse_args()
 
@@ -26,11 +27,15 @@ ax.scatter(0, 0, marker="*", color="red", s=150)
 ax.autoscale()
 ax.margins(0.1)
 
-ax.set_xlabel('X')
-ax.set_ylabel('Y')
+ax.set_xlabel('x (m) - Relative to LiDAR')
+ax.set_ylabel('y (m) - Relative to LiDAR')
+
+ax.legend(["Points (n={})".format(len(points)), "LiDAR"])
+
+ax.set_title(args.title)
 
 # Save the file if outFile specified, otherwise display it
 if(args.outFile is not None):
-    plt.savefig(args.outFile)
+    plt.savefig(args.outFile, dpi=300)
 else:
     plt.show()

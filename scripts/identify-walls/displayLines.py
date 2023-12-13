@@ -16,6 +16,7 @@ parser = argparse.ArgumentParser(
 )
 parser.add_argument("csvFile", help="Path of .csv frame file to display.")
 parser.add_argument("--outFile", help="Path to write output figure to.")
+parser.add_argument("--title", help="Title for plot")
 args = parser.parse_args()
 
 with open(args.csvFile, "r") as file:
@@ -34,20 +35,23 @@ with open(args.csvFile, "r") as file:
 
     fig, ax = plt.subplots()
     ax.add_collection(lc)
-    ax.scatter(0, 0, marker="*", color="red")
-
-    for i, line in enumerate(lines):
-        ax.annotate("{}".format(i), line[0])
+    marker = ax.scatter(0, 0, marker="*", color="red")
 
     ax.autoscale()
     ax.margins(0.1)
 
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
+    ax.set_title(args.title)
+
+    ax.set_xlabel('x (m) - Relative to LiDAR')
+    ax.set_ylabel('y (m) - Relative to LiDAR')
+
+    
+
+    ax.legend([marker], ["LiDAR"])
     
     # Save the file if outFile specified, otherwise display it
     if(args.outFile is not None):
-        plt.savefig(args.outFile)
+        plt.savefig(args.outFile, dpi=300)
     else:
         plt.show()
 
