@@ -17,7 +17,8 @@ mkdir -p out/
 rm -f out/out.csv
 rm -f ./identifyWalls
 
-nvcc identifyWalls.cpp fileHandler.cpp dataFrame.cpp gpuImplementation.cu segmentMerging.cu bendDetection.cu -Xcompiler -Wall -Xptxas -O3 -Xcompiler -O3 --use_fast_math --restrict -std=c++17 -o identifyWalls
+echo "Not using fast math."
+nvcc identifyWalls.cpp fileHandler.cpp dataFrame.cpp gpuImplementation.cu segmentMerging.cu bendDetection.cu -Xcompiler -Wall -Xptxas -O3 -Xcompiler -O3 --restrict -std=c++17 -o identifyWalls
 
 # Ensure all input files are loaded into memory on our node
 # This is the more realistic scenerio, as a LiDAR would be able to

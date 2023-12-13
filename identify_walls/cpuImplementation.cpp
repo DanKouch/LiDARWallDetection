@@ -33,7 +33,7 @@
 void identifyStraightSegments(const data_frame_desc_t *desc, segment_desc_t segmentDescOut[], uint32_t maxSegmentDesc, uint32_t *numSegmentDesc) {
 
     uint32_t curSegmentLength = 0;
-    uint32_t curSegmentStart;
+    uint32_t curSegmentStart = 0;
     uint32_t numSegments = 0;
 
     for(long i = 0; i < desc->numPoints; i++) {

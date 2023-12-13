@@ -1,7 +1,7 @@
 #!/usr/bin/env zsh
 #SBATCH --job-name=identifyWalls
 #SBATCH --partition=instruction
-#SBATCH --time=00-00:05:00
+#SBATCH --time=00-00:02:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=16G
@@ -10,8 +10,6 @@
 cd $SLURM_SUBMIT_DIR
 
 module load gcc/11.3.0
-
-BIN_DIR=../sample_input/ehall_1800_back/bin/
 
 mkdir -p out/
 rm -f out/out.csv

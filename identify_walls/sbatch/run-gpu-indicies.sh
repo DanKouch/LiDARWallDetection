@@ -1,7 +1,7 @@
 #!/usr/bin/env zsh
 #SBATCH --job-name=identifyWalls
 #SBATCH --partition=instruction
-#SBATCH --time=00-00:05:00
+#SBATCH --time=00-00:02:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
 #SBATCH --gres=gpu:1
@@ -13,13 +13,11 @@ cd $SLURM_SUBMIT_DIR
 module load nvidia/cuda/11.8.0
 module load gcc/11.3.0
 
-BIN_DIR=../sample_input/ehall_1800_back/bin/
-
 mkdir -p out/
 rm -f out/out.csv
 rm -f ./identifyWalls
 
-nvcc identifyWalls.cpp fileHandler.cpp dataFrame.cpp gpuImplementation.cu segmentMerging.cu bendDetection.cu -Xcompiler -Wall -Xptxas -O3 -Xcompiler -O3 -DPRINT_INDICES --use_fast_math -std=c++17 -o identifyWalls
+nvcc identifyWalls.cpp fileHandler.cpp dataFrame.cpp gpuImplementation.cu segmentMerging.cu bendDetection.cu -Xcompiler -Wall -Xptxas -O3 -Xcompiler -O3 -DPRINT_INDICES --use_fast_math --restrict -std=c++17 -o identifyWalls
 
 # Ensure all input files are loaded into memory on our node
 # This is the more realistic scenerio, as a LiDAR would be able to

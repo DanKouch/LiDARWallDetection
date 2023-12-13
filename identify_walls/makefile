@@ -4,19 +4,27 @@ binDir := ../sample_input/ehall_1800_back/bin
 
 run:
 	mkdir -p out/
-	(sbatch --wait sbatch/run-gpu.sh && echo "Output:" && cat IdentifyWalls.out)
+	(sbatch --export=BIN_DIR='$(binDir)' --wait sbatch/run-gpu.sh && echo "Output:" && cat IdentifyWalls.out)
 
 run-indicies:
 	mkdir -p out/
-	(sbatch --wait sbatch/run-gpu-indicies.sh && echo "Output:" && cat IdentifyWalls.out)
+	(sbatch --export=BIN_DIR='$(binDir)' --wait sbatch/run-gpu-indicies.sh && echo "Output:" && cat IdentifyWalls.out)
+
+run-uvm:
+	mkdir -p out/
+	(sbatch --export=BIN_DIR='$(binDir)' --wait sbatch/run-gpu-uvm.sh && echo "Output:" && cat IdentifyWalls.out)
+
+run-no-fast-math:
+	mkdir -p out/
+	(sbatch --export=BIN_DIR='$(binDir)' --wait sbatch/run-gpu-no-fast-math.sh && echo "Output:" && cat IdentifyWalls.out)
 
 run-cpu:
 	mkdir -p out/
-	(sbatch --wait sbatch/run-cpu.sh && echo "Output:" && cat IdentifyWalls.out)
+	(sbatch --export=BIN_DIR='$(binDir)' --wait sbatch/run-cpu.sh && echo "Output:" && cat IdentifyWalls.out)
 	
 run-indicies-cpu:
 	mkdir -p out/
-	(sbatch --wait sbatch/run-cpu-indicies.sh && echo "Output:" && cat IdentifyWalls.out)
+	(sbatch --export=BIN_DIR='$(binDir)' --wait sbatch/run-cpu-indicies.sh && echo "Output:" && cat IdentifyWalls.out)
 	
 
 # Warning! Don't use the following on Euler, as they aren't wrapped in a sbatch script
