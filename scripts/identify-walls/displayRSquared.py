@@ -1,3 +1,6 @@
+# Displays R-squared data for standard output of single-frame
+# runs compiled with -DPRINT_R_SQUARED.
+
 import argparse
 import numpy as np
 import csv
@@ -48,6 +51,7 @@ with open(args.csvFile, "r") as file:
 
     plt.colorbar(mpl.cm.ScalarMappable(cmap=colormap), ax=ax)
 
+    # Save the file if outFile specified, otherwise display it
     if(args.outFile is not None):
         plt.savefig(args.outFile)
     else:

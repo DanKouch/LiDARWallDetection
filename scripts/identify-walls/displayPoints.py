@@ -1,3 +1,5 @@
+# Plots the points in a zero-degree .bin file
+
 import argparse
 from zeroDegreeBinUtils import *
 import matplotlib.pyplot as plt
@@ -27,6 +29,7 @@ ax.margins(0.1)
 ax.set_xlabel('X')
 ax.set_ylabel('Y')
 
+# Save the file if outFile specified, otherwise display it
 if(args.outFile is not None):
     plt.savefig(args.outFile)
 else:

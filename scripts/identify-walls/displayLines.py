@@ -1,3 +1,7 @@
+# Displays lines from an out.csv file generated without -DPRINT_INDICIES
+# Note: This will print all lines in a file, if you want to limit it to 
+# a specific frame, grep the .csv file for that frame name
+
 import argparse
 import numpy as np
 import csv
@@ -41,6 +45,7 @@ with open(args.csvFile, "r") as file:
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
     
+    # Save the file if outFile specified, otherwise display it
     if(args.outFile is not None):
         plt.savefig(args.outFile)
     else:

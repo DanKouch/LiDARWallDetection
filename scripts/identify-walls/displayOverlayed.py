@@ -1,3 +1,7 @@
+# Displays lines from an out.csv file overlaid on the points of a
+# data frame. Note that the out.csv file must be generated with
+# -DPRINT_INDICIES.
+
 import argparse
 import numpy as np
 from zeroDegreeBinUtils import *
@@ -54,6 +58,7 @@ ax.margins(0.1)
 ax.set_xlabel('X')
 ax.set_ylabel('Y')
 
+# Save the file if outFile specified, otherwise display it
 if(args.outFile is not None):
     plt.savefig(args.outFile)
 else:
