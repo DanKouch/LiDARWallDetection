@@ -4,12 +4,22 @@ binDir := ../sample_input/ehall_1800_back/bin
 
 run:
 	mkdir -p out/
-	(sbatch --wait run-gpu.sh && echo "Output:" && cat ZeroDegree.out)
+	(sbatch --wait sbatch/run-gpu.sh && echo "Output:" && cat ZeroDegree.out)
+
+run-indicies:
+	mkdir -p out/
+	(sbatch --wait sbatch/run-gpu-indicies.sh && echo "Output:" && cat ZeroDegree.out)
+
 
 run-cpu:
 	mkdir -p out/
-	(sbatch --wait run-cpu.sh && echo "Output:" && cat ZeroDegree.out)
+	(sbatch --wait sbatch/run-cpu.sh && echo "Output:" && cat ZeroDegree.out)
 	
+run-indicies-cpu:
+	mkdir -p out/
+	(sbatch --wait sbatch/run-cpu-indicies.sh && echo "Output:" && cat ZeroDegree.out)
+	
+
 # Warning! Don't use the following on Euler, as they aren't wrapped in a sbatch script
 
 display-overlayed-cpu:
