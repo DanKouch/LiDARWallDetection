@@ -1,4 +1,4 @@
-#ifdef CPU_IMPLEMENTATION
+#ifndef __NVCC__
 
 #include <cstdio>
 #include <cstdint>

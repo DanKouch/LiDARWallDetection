@@ -44,7 +44,7 @@ int mmap_file(const char *filePath, mmap_descriptor_t *desc) {
     // Perform the memory mapping
     desc->size = (long) statBuf.st_size;
 
-#ifndef CPU_IMPLEMENTATION
+#ifdef __NVCC__
     desc->data = mmap(0, desc->size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_LOCKED, fd, 0);
 #else
     desc->data = mmap(0, desc->size, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);

@@ -1,4 +1,4 @@
-#ifndef CPU_IMPLEMENTATION
+#ifdef __NVCC__
 
 #ifndef CUDA_UTIL_CUH
 #define CUDA_UTIL_CUH

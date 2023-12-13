@@ -1,4 +1,4 @@
-#ifndef CPU_IMPLEMENTATION
+#ifdef __NVCC__
 
 #include <cstdio>
 #include <assert.h>

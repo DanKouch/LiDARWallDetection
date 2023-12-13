@@ -5,7 +5,7 @@
 #include <cstdlib>
 #include <chrono>
 
-#ifndef CPU_IMPLEMENTATION
+#ifdef __NVCC__
 #include <cuda.h>
 #include <cuda_profiler_api.h>
 #include "cudaUtil.cuh"
@@ -27,7 +27,7 @@ using namespace std;
 
 int processFrame(char *frameFilePath, char *frameName, FILE *outputFile, void *d_points, segment_desc_t *segmentDescs) {
     assert(segmentDescs != NULL);
-    #ifndef CPU_IMPLEMENTATION
+    #ifdef __NVCC__
         assert(d_points != NULL);
     #endif
 
@@ -44,7 +44,7 @@ int processFrame(char *frameFilePath, char *frameName, FILE *outputFile, void *d
 
     assert(dataFrameDesc.numPoints <= MAX_POINTS);
 
-#ifndef CPU_IMPLEMENTATION
+#ifdef __NVCC__
     #ifdef USE_UVM_POINT_DATA
         CHECK_CUDA(cudaHostRegister(mmapDesc.data, mmapDesc.size, cudaHostRegisterDefault | cudaHostRegisterMapped | cudaHostRegisterReadOnly));
         CHECK_CUDA(cudaHostGetDevicePointer((void**) &d_points, (void*) mmapDesc.data, 0));
@@ -67,12 +67,10 @@ int processFrame(char *frameFilePath, char *frameName, FILE *outputFile, void *d
     CHECK_CUDA(cudaEventCreate(&start));
     CHECK_CUDA(cudaEventCreate(&stop));
 
-    cudaProfilerStart();
     CHECK_CUDA(cudaEventRecord(start));
     planeExtract(d_px, d_py, d_pz, dataFrameDesc.numPoints, segmentDescs, &numSegmentDesc);
     CHECK_CUDA(cudaEventRecord(stop));
     CHECK_CUDA(cudaEventSynchronize(stop));
-    cudaProfilerStop();
 
     float ms;
     CHECK_CUDA(cudaEventElapsedTime(&ms, start, stop));
@@ -154,7 +152,7 @@ int main(int argc, char **argv) {
     // Allocate working memory for plane extraction
     void *d_points = NULL;
     segment_desc_t *segmentDescs;
-#ifndef CPU_IMPLEMENTATION
+#ifdef __NVCC__
     CHECK_CUDA(cudaMalloc((void **) &d_points, sizeof(float) * MAX_POINTS * 3));
     CHECK_CUDA(cudaMallocManaged((void **) &segmentDescs, sizeof(segment_desc_t) * MAX_SEGMENTS, cudaMemAttachGlobal));
     planeExtractAllocateTempMem();
@@ -183,10 +181,16 @@ int main(int argc, char **argv) {
     float ms = (chrono::duration_cast<chrono::duration<float, std::milli>> (end-start)).count();
 
     printf("Took %f ms to process %d frames.\n", ms, framesCompleted);
-    printf("ms per Frame: %f, FPS: %f\n", ms/framesCompleted, framesCompleted/(ms/1000));
+    printf("ms per Frame: %f, FPS: %f.\n", ms/framesCompleted, framesCompleted/(ms/1000));
+
+#ifdef __NVCC__
+    printf("Used GPU implementation.\n");
+#else
+    printf("Used CPU implementation.\n");
+#endif
 
     // Deallocate working memory for plane extraction
-#ifndef CPU_IMPLEMENTATION
+#ifdef __NVCC__
     CHECK_CUDA(cudaFree(segmentDescs));
     planeExtractFreeTempMem();
     #ifndef USE_UVM_POINT_DATA

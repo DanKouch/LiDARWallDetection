@@ -21,4 +21,13 @@ rm -f ./zeroDegree
 
 nvcc zeroDegree.cpp fileHandler.cpp dataFrame.cpp gpuImplementation.cu -Xcompiler -Wall -Xptxas -O3 -Xcompiler -O3 -DPRINT_INDICES --use_fast_math -std=c++17 -o zeroDegree
 
+# Ensure all input files are loaded into memory on our node
+# This is the more realistic scenerio, as a LiDAR would be able to
+# directly stream it's data to our application; we wouldn't need to
+# wait for disk access.
+for i in {0..3}
+do
+    ./zeroDegree /dev/null $BIN_DIR 0
+done
+
 ./zeroDegree out/out.csv $BIN_DIR 0
