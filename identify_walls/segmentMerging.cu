@@ -50,7 +50,6 @@ __global__ void mergeNeighboringSegments(segment_desc_t *segmentDescs,
         segment_desc_t cur = segmentDescs[curIdx];
         segment_desc_t prev = segmentDescs[prevIdx];
 
-        // TODO: Determine if this test is necessary
         if(cur.segmentEnd != cur.segmentStart && prev.segmentStart != prev.segmentEnd) {
 
             float x1 = pX[prev.segmentStart];
