@@ -4,11 +4,12 @@
 This program takes in multiple frames of zero-degree scan angle LiDAR data from a SICK multiScan 100 scanner, and outputs the walls (2D line segments in x and y coordinates) it detects for each frame. We've implemented our algorithm in both CPU and GPU code for the sake of comparision, which each have their respective `make` rules. The program's code is in `identify_walls/`, everything else is supporting files for collecting LiDAR data from the scanner and displaying that data, as well as the program's output.
 
 ## Running The Program
-1. Download repository to Euler
-1. If using our collected LiDAR data (which you should be), decompress `sample_input.tgz`
-2. Change directories to `identify-walls/`
-3. Run `make run binDir=BIN_DIR` to run our GPU implementation
-4. Run `make run-cpu binDir=BIN_DIR` to run our CPU implementation
+1. Ensure you have git lfs installed (It's installed on Euler)
+2. Download repository to Euler
+3. If using our collected LiDAR data (which you should be), decompress `sample_input.tgz`
+4. Change directories to `identify-walls/`
+5. Run `make run binDir=BIN_DIR` to run our GPU implementation
+6. Run `make run-cpu binDir=BIN_DIR` to run our CPU implementation
 
 `BIN_DIR` can be any of the following for our sample input:
 - `../sample_input/ehall_1800_front/bin/` for a scan from the front of 1800 Engineering Hall
